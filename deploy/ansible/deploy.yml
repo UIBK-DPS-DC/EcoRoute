@@ -1,0 +1,337 @@
+- name: Prepare all servers
+  hosts: router:model_nvidia:model_amd:model_cpu
+  tags: copy
+  become: yes
+  remote_user: cc
+  vars:
+    mab: false
+
+  tasks:
+    - name: Copy router directory
+      copy:
+        src: "../../src/router"
+        dest: "/home/cc/code"
+        owner: cc
+        group: cc
+    
+    - name: Copy model directory
+      copy:
+        src: "../../src/inference"
+        dest: "/home/cc/code"
+        owner: cc
+        group: cc
+    
+    - name: Copy datasets
+      copy:
+        src: "../../src/hf_datasets/datasets.tar.gz"
+        dest: "/home/cc/code/datasets.tar.gz"
+        owner: cc
+        group: cc
+
+    - name: Ensure mab directory exists
+      file:
+        path: /home/cc/code/mab
+        state: directory
+        mode: '0755'
+
+    - name: Ensure db directory exists
+      file:
+        path: /home/cc/code/db
+        state: directory
+        mode: '0755'
+
+    - name: Copy Multi-Armed-Bandit model
+      copy:
+        src: "../../config/mab/{{ mab_model }}"
+        dest: "/home/cc/code/mab/mab_model.vw"
+        owner: cc
+        group: cc
+      when: mab
+    
+    - name: Unarchive datasets
+      unarchive:
+        src: "/home/cc/code/datasets.tar.gz"
+        dest: "/home/cc/code"
+        remote_src: true
+    
+    - name: Copy docker compose
+      copy:
+        src: "../../src/docker-compose.yml"
+        dest: "/home/cc/code/docker-compose.yml"
+        owner: cc
+        group: cc
+    
+    - name: Copy configs
+      copy:
+        src: "../../config"
+        dest: "/home/cc/code"
+        owner: cc
+        group: cc
+
+    - name: Ensure NATS config directory exists
+      file:
+        path: /home/cc/code/config/nats
+        state: directory
+        mode: '0755'
+    
+    - name: Create router map
+      set_fact:
+        router_map: >-
+          {{
+            dict(
+              (groups['router'])
+              | map('extract', hostvars)
+              | map(attribute='role')
+              | zip(
+                  (groups['router'])
+                  | map('extract', hostvars)
+                  | map(attribute='ansible_host')
+                )
+            )
+          }}
+    
+    - name: Generate configs
+      template: 
+        src: nats.conf.j2
+        dest: /home/cc/code/config/nats/my-server.conf
+        owner: cc
+        group: cc
+
+    # - name: Copy tmp config for testing with only one site
+    #   copy:
+    #     src: "../../config/nats/server-edge.conf"
+    #     dest: "/home/cc/code/config/nats/my-server.conf"
+
+- name: Install docker
+  hosts: router #:model_nvidia:model_amd
+  tags: docker
+  become: yes
+  remote_user: cc
+
+  tasks:
+    - name: Remove Docker-related packages
+      become: true
+      ansible.builtin.apt:
+        name:
+          - docker.io
+          - docker-compose
+          - docker-compose-v2
+          - docker-doc
+          - podman-docker
+          - containerd
+          - runc
+        state: absent
+        purge: true
+        autoremove: true
+        update_cache: false
+    - name: Install certificates and curl
+      become: true
+      ansible.builtin.apt:
+        name:
+          - ca-certificates 
+          - curl
+        update_cache: true
+
+    - name: Ensure /etc/apt/keyrings exists
+      become: true
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Download Docker GPG key
+      become: true
+      ansible.builtin.get_url:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: "0644"
+        force: true
+
+    - name: Get architecture
+      become: true
+      ansible.builtin.command: dpkg --print-architecture
+      register: dpkg_arch
+      changed_when: false
+
+    - name: Create Docker repository file
+      become: true
+      ansible.builtin.copy:
+        dest: /etc/apt/sources.list.d/docker.sources
+        mode: "0644"
+        content: |
+          Types: deb
+          URIs: https://download.docker.com/linux/ubuntu
+          Suites: {{ ansible_distribution_release }}
+          Components: stable
+          Architectures: {{ dpkg_arch.stdout }}
+          Signed-By: /etc/apt/keyrings/docker.asc
+    
+    - name: Install docker
+      become: true
+      ansible.builtin.apt:
+        name:
+          - docker-ce 
+          - docker-ce-cli 
+          - containerd.io 
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        update_cache: true
+
+- name: Start routers
+  hosts: router
+  tags: routers
+  remote_user: cc
+  become: true
+
+  tasks:
+    # - name: Start NATS server and router containers
+    #   script: ./run-router.sh
+    #   environment:
+    #     ROUTER: "{{ router }}"
+    #     NATS: "{{ nats }}"
+    #     SITE: "{{ role }}"
+    - name: Start NATS container
+      community.docker.docker_compose_v2:
+        project_src: /home/cc/code
+        files:
+        - docker-compose.yml
+        services:
+          - "{{ nats }}"
+        state: present
+    - name: Start router service
+      community.docker.docker_compose_v2:
+        project_src: /home/cc/code
+        files:
+        - docker-compose.yml
+        services:
+          - "{{ router }}"
+        build: always
+        recreate: always
+        state: present
+
+- name: Install serving system on NVIDIA
+  hosts: model_nvidia
+  tags: nvidia
+  remote_user: cc
+
+  tasks:
+    - name: Run vLLM install script
+      script: ./install-vllm.sh
+    - name: Copy vllm script
+      copy:
+        src: "./{{ item }}"
+        dest: "/home/cc/{{ item }}"
+        owner: cc
+        group: cc
+        mode: 0700
+      loop:
+        - vllm.sh
+        - model.sh
+    - name: Run vLLM servers
+      script: ./run-vllm.sh
+      environment:
+        MODEL: "{{ model }}"
+        HF_TOKEN: "{{ hf_token }}"
+
+- name: Install serving system on AMD
+  hosts: model_amd
+  tags: amd
+  remote_user: cc
+
+  tasks:
+    - name: Copy vllm script
+      copy:
+        src: "./{{ item }}"
+        dest: "/home/cc/{{ item }}"
+        owner: cc
+        group: cc
+        mode: 0700
+      loop:
+        - model.sh
+    - name: Run OLLAMA install script
+      script: ./run-amd-model.sh
+      environment:
+        MODEL: "{{ model }}"
+        MODEL_FILE: "{{ model_file }}"
+
+- name: Install serving system on CPU devices
+  hosts: model_cpu
+  tags: cpu
+  remote_user: cc
+
+  tasks:
+    - name: Copy model directory
+      copy:
+        src: "../../src/inference"
+        dest: "/home/cc/code"
+    - name: Run install script
+      script: ./run-edge-model.sh
+      environment:
+        MODEL: "{{ model }}"
+        MODEL_FILE: "{{ model_file }}"
+
+
+- name: Start models
+  hosts: model_nvidia:model_amd:model_cpu
+  tags: models
+  remote_user: cc
+
+  tasks:
+    - name: Ensure log directory exists
+      file:
+        path: "{{ llm_dir }}/llm-log"
+        state: directory
+        mode: '0755'
+    - name: Find corresponding router
+      set_fact:
+        matching_router: "{{ item }}"
+      loop: "{{ (groups['router']) }}"
+      when: hostvars[item]['role'] == role
+    - name: Install dependencies
+      script: ./model.sh
+      environment:
+        MODEL: "{{ model }}"
+        NATS: "{{ hostvars[matching_router]['ansible_host'] }}"
+        SITE: "{{ role }}"
+    - name: Install LLM systemd service
+      become: true
+      ansible.builtin.template:
+        src: llm.service.j2
+        dest: /etc/systemd/system/llm.service
+        mode: "0644"
+
+    - name: Reload systemd
+      become: true
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Enable and start service
+      become: true
+      ansible.builtin.systemd:
+        name: llm.service
+        enabled: true
+        state: started
+
+- name: Set ansible hosts
+  hosts: localhost
+  tags: url
+  become: true
+  tasks:
+    - name: Add inventory hosts to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        regexp: ".*{{ item }}$"
+        line: "{{ hostvars[item].ansible_host }} {{ item }}"
+      loop: "{{ groups['all'] }}"
+# - name: Add inventory hosts to known_hosts
+#   hosts: localhost
+#   tags: known_hosts
+#   gather_facts: false
+#   tasks:
+#     - name: Add SSH fingerprints
+#       ansible.builtin.known_hosts:
+#         name: "{{ item }}"
+#         key: "{{ lookup('pipe', 'ssh-keyscan -H ' + hostvars[item].ansible_host) }}"
+#         path: "{{ lookup('env', 'HOME') }}/.ssh/known_hosts"
+#       loop: "{{ groups['all'] }}"
+

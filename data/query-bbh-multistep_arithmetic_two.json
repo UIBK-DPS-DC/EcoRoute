@@ -1,0 +1,8 @@
+{
+    "query": "((0 * 9 + -8 * 7) - (7 - 9 + 1 + 0)) =",
+    "reference": {
+        "target": "-55",
+        "dataset": "bbh",
+        "subset": "multistep_arithmetic_two"
+    }
+}

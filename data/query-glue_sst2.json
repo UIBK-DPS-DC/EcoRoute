@@ -1,0 +1,8 @@
+{
+    "query": "What is the overall sentiment expressed in the following sentence? Answer with ONLY one label. For positive answer with 1. For negative answer with 0.\n\nfound writer-director mitch davis 's wall of kitsch hard going . ",
+    "reference": {
+        "target": "0",
+        "dataset": "glue_sst2",
+        "subset": null
+    }
+}

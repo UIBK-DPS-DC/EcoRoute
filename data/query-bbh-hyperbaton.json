@@ -1,0 +1,8 @@
+{
+    "query": "Which sentence has the correct adjective order:\nOptions:\n(A) lovely tiny triangular black knife\n(B) black triangular tiny lovely knife",
+    "reference": {
+        "target": "(A)",
+        "dataset": "bbh",
+        "subset": "hyperbaton"
+    }
+}

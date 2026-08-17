@@ -1,0 +1,9 @@
+{
+  "llm_id": "llm-edge-1",
+  "tasks": ["summarization", "qa"],
+  "max_tokens": 4096,
+  "latency_ms": 120,
+  "cost": 0.002,
+  "load": 0.6,
+  "location": "edge"
+}

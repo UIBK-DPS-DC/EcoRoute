@@ -1,0 +1,8 @@
+{
+    "query": "what was samantha's cousin's name on bewitched\nAnswer with a short phrase only.",
+    "reference": {
+        "target": "List of Bewitched characters Serena (Elizabeth Montgomery) is Samantha's cousin on Maurice's side.[4] Serena is egocentric and looks like Samantha (except for a tattoo under her left eye). Also played by Montgomery, Serena is credited as \"Pandora Spocks\" (a spin on the phrase \"Pandora's box\") in many of her appearances from 1969 to 1971. Serena is first seen in episode, #54, \"And Then There Were Three\".[5] Serena is the antithesis of Samantha, in most episodes sporting a beauty mark on her cheek, raven-black cropped hair and mod mini-skirts. Ever mischievous, bawdy and irresponsible, Serena often flirts with Larry Tate (calling the white-haired Tate \"Cotton-Top\"), just for sport. She occasionally dates mortals, and has been known to flirt with Darrin, while pretending to be Samantha. Despite her conduct and frequent co-plotting with Endora, Serena has been known to assist Samantha and Darrin, although she finds them \"both a bit square\".",
+        "dataset": "natural_questions",
+        "subset": null
+    }
+}

@@ -1,0 +1,2 @@
+model: "Qwen/Qwen2.5-Coder-32B-Instruct-GGUF"
+model_file: "qwen2.5-coder-32b-instruct-q3_k_m.gguf"

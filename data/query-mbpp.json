@@ -1,0 +1,8 @@
+{
+    "query": "Write a function to caluclate perimeter of a parallelogram.",
+    "reference": {
+        "target": "[\"assert parallelogram_perimeter(10,20)==400\",\"assert parallelogram_perimeter(15,20)==600\",\"assert parallelogram_perimeter(8,9)==144\"]",
+        "dataset": "mbpp",
+        "subset": null
+    }
+}

@@ -1,0 +1,26 @@
+[Unit]
+Description=LLM Inference Service
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory={{ llm_dir }}
+
+Environment=LLM_ID={{ model }}
+Environment=NATS_URL={{ hostvars[matching_router]['ansible_host'] }}
+Environment=SITE={{ role }}
+
+ExecStart={{ llm_dir }}/inference/llm-venv/bin/python -u {{ llm_dir }}/inference/inference/llm.py
+
+Restart=always
+RestartSec=5
+
+StandardOutput=journal
+StandardError=journal
+
+# Optional: run as a non-root user
+# User=llm
+# Group=llm
+
+[Install]
+WantedBy=multi-user.target

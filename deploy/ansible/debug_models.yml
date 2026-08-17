@@ -1,0 +1,33 @@
+- name: Prepare models
+  hosts: model_nvidia:model_amd:model_cpu
+  tags: models
+  become: yes
+  remote_user: cc
+
+  tasks:
+    - name: Copy model directory
+      copy:
+        src: "../../src/inference"
+        dest: "/home/cc/code"
+        owner: cc
+        group: cc
+    
+    - name: Copy configs
+      copy:
+        src: "../../config"
+        dest: "/home/cc/code"
+        owner: cc
+        group: cc
+
+- name: Reset models
+  hosts: model_nvidia:model_amd:model_cpu
+  tags: reset
+  become: yes
+  remote_user: cc
+
+  tasks:
+    - name: Restart LLM service
+      become: true
+      ansible.builtin.systemd:
+        name: llm.service
+        state: restarted

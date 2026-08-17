@@ -1,0 +1,8 @@
+{
+    "query": "I have a piano, an accordion, a trombone, two clarinets, two violins, a trumpet, a flute, and a drum. How many musical instruments do I have?",
+    "reference": {
+        "target": "10",
+        "dataset": "bbh",
+        "subset": "object_counting"
+    }
+}

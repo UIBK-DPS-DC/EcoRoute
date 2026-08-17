@@ -1,0 +1,166 @@
+- name: Prepare routers
+  hosts: router
+  tags: routers
+  become: yes
+  remote_user: cc
+
+  tasks:
+    - name: Copy router directory
+      copy:
+        src: "../../src/router"
+        dest: "/home/cc/code"
+        owner: cc
+        group: cc
+    
+    - name: Copy configs
+      copy:
+        src: "../../config"
+        dest: "/home/cc/code"
+        owner: cc
+        group: cc
+
+    - name: Copy docker compose
+      copy:
+        src: "../../src/docker-compose.yml"
+        dest: "/home/cc/code/docker-compose.yml"
+        owner: cc
+        group: cc
+
+- name: Install NATS cli
+  hosts: router
+  tags: nats
+  remote_user: cc
+
+  tasks:
+    - name: Get latest NATS CLI version
+      uri:
+        url: https://api.github.com/repos/nats-io/natscli/releases/latest
+        return_content: true
+      register: nats_release
+
+    - name: Set NATS CLI download URL
+      set_fact:
+        natscli_url: >-
+          {{
+            nats_release.json.assets
+            | selectattr('name', 'match', 'nats-.*-linux-amd64.zip')
+            | map(attribute='browser_download_url')
+            | first
+          }}
+
+    - name: Download NATS CLI
+      get_url:
+        url: "{{ natscli_url }}"
+        dest: /tmp/natscli.zip
+
+    - name: Install unzip
+      apt:
+        name: unzip
+        state: present
+        update_cache: true
+      become: true
+
+    - name: Unpack NATS CLI
+      unarchive:
+        src: /tmp/natscli.zip
+        dest: /tmp
+        remote_src: true
+
+    - name: Find nats binary
+      find:
+        paths: /tmp
+        patterns: nats
+        recurse: true
+        file_type: file
+      register: nats_binary
+
+    - name: Install nats binary
+      copy:
+        src: "{{ nats_binary.files[0].path }}"
+        dest: /usr/local/bin/nats
+        mode: '0755'
+        remote_src: true
+      become: true
+
+- name: Reset routers
+  hosts: router
+  tags: reset
+  become: true
+  vars:
+    reset: true
+
+  tasks:
+    # - name: Get all JetStream streams
+    #   command: nats stream ls --json
+    #   register: streams_json
+    #   changed_when: false
+
+    # - name: Parse stream names
+    #   set_fact:
+    #     stream_names: >-
+    #       {{
+    #         (streams_json.stdout | from_json)
+    #         | map(attribute='config')
+    #         | map(attribute='name')
+    #         | list
+    #       }}
+
+    # - name: Purge all streams
+    #   command: "nats stream purge {{ item }} --force"
+    #   loop: "{{ stream_names }}"
+    - name: Purge all streams
+      command: "nats stream purge {{ item }} --force"
+      loop:
+        - "ROUTING_REQUESTS"
+        - "ROUTING_RESPONSE"
+        - "ROUTING_REQUESTS_ROUTER"
+
+    - name: Find duckdb files
+      ansible.builtin.find:
+        paths: "/home/cc/code/db"
+        patterns: "*.duckdb"
+        file_type: file
+      register: duckdb_files
+      when: reset
+
+    - name: Delete log file
+      ansible.builtin.file:
+        path: "/home/cc/code/db/app.log"
+        state: absent
+      when: reset
+
+    - name: Delete database file
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ duckdb_files.files }}"
+      when: reset
+
+- name: Start routers
+  hosts: router
+  tags: start
+  remote_user: cc
+  become: true
+
+  tasks:
+    - name: Start NATS container
+      community.docker.docker_compose_v2:
+        project_src: /home/cc/code
+        files:
+        - docker-compose.yml
+        services:
+          - "{{ nats }}"
+        state: present
+        recreate: always
+    - name: Start router service
+      community.docker.docker_compose_v2:
+        project_src: /home/cc/code
+        files:
+        - docker-compose.yml
+        services:
+          - "{{ router }}"
+        build: always
+        recreate: always
+        state: present
+    
+

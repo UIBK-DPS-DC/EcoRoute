@@ -1,0 +1,3 @@
+router: router-tacc
+nats: nats-tacc
+mab_model: mab_model_tacc.vw

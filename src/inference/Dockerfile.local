@@ -1,0 +1,8 @@
+FROM inference-base
+
+WORKDIR /app
+
+COPY . .
+
+CMD ["python", "inference/llm.py"]
+

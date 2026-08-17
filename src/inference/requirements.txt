@@ -1,0 +1,8 @@
+nats-py
+nvidia-ml-py3
+httpx
+pynvml
+python-dotenv
+amdsmi==6.3.3
+psutil
+pydantic

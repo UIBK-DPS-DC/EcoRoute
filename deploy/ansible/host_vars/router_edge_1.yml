@@ -1,0 +1,3 @@
+router: router-edge
+nats: localhost
+mab_model: mab_model_edge.vw

@@ -1,0 +1,8 @@
+{
+    "query": "True or ( not ( True ) ) is",
+    "reference": {
+        "target": "True",
+        "dataset": "bbh",
+        "subset": "boolean_expressions"
+    }
+}

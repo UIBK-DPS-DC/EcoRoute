@@ -1,0 +1,8 @@
+{
+    "query": "Consider the following statement and hypothesis. Determine if the statement entails, contradicts or is neutral to the hypothesis.\nAnswer with ONLY one label. For entailment answer with 0\n For neutral answer with 1\n For contradiction answer with 2\n\nStatement: Polarization  Slobodan Milosevic--first as a Communist and then as a Serbian nationalist--whipped up anti-Albanian sentiment.\nHypothesis: Milosevic was a Communist and then a nationalists who disliked Albanians and wanted to ruin their country.",
+    "reference": {
+        "target": "1",
+        "dataset": "glue_mnli",
+        "subset": null
+    }
+}

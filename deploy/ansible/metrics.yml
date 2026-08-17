@@ -1,0 +1,78 @@
+- name: Create timestamp
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - set_fact:
+        backup_timestamp: "{{ lookup('pipe', 'date +%Y-%m-%d_%H-%M-%S') }}"
+
+- name: Copy database file on UC and TACC
+  hosts: router
+  tags: copy
+  become: yes
+  remote_user: cc
+  vars_files:
+    - vars/common.yml
+  vars:
+    run_config:
+      queries_per_second: "{{ queries_per_second }}"
+      duration: "{{ duration }}"
+
+  tasks:
+    - name: Ensure stored directory exists
+      file:
+        path: /home/cc/code/stored/{{ hostvars['localhost']['backup_timestamp'] }}
+        state: directory
+        mode: '0755'
+        
+    - name: Copy database file
+      copy:
+        src: "/home/cc/code/db/"
+        dest: "/home/cc/code/stored/{{ hostvars['localhost']['backup_timestamp'] }}"
+        remote_src: true
+    
+    - name: Copy config file
+      copy:
+        src: "/home/cc/code/config/router/config.yml"
+        dest: "/home/cc/code/stored/{{ hostvars['localhost']['backup_timestamp'] }}/config.yml"
+        remote_src: true
+
+    - name: Write run config as YAML
+      copy:
+        dest: "/home/cc/code/stored/{{ hostvars['localhost']['backup_timestamp'] }}/run_config.yml"
+        content: "{{ run_config | to_nice_yaml }}"
+      run_once: true
+
+    - name: Download database files
+      ansible.posix.synchronize:
+        mode: pull
+        src: "/home/cc/code/stored/"
+        dest: "{{ save_dir }}/{{ role }}/"
+    
+
+- name: Copy model config files on UC and TACC
+  hosts: model_nvidia:model_amd:model_cpu
+  tags: models
+  become: yes
+  remote_user: cc
+
+  vars_files:
+    - vars/common.yml
+
+  tasks:
+    - name: Ensure stored directory exists
+      file:
+        path: /home/cc/code/stored/{{ hostvars['localhost']['backup_timestamp'] }}
+        state: directory
+        mode: '0755'
+
+    - name: Copy config file
+      copy:
+        src: "/home/cc/code/config/inference/config.yml"
+        dest: "/home/cc/code/stored/{{ hostvars['localhost']['backup_timestamp'] }}/config.yml"
+        remote_src: true
+    
+    - name: Download config
+      ansible.posix.synchronize:
+        mode: pull
+        src: "/home/cc/code/stored/"
+        dest: "{{ save_dir }}/{{ role }}/model/"

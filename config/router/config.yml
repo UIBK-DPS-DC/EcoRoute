@@ -1,0 +1,29 @@
+router:
+  model_ttl: 30
+  router_heartbeat_interval_seconds: 15
+  use_task_classification: true
+  router_log_file: "/data/db/"
+  router_logging_level: "info"
+  query_timeout: 30.0
+
+trainer:
+  training_interval_threshold_seconds: 10
+  training_batch_size: 10
+  normalizer: "mean"
+  reward_output_quality_weight: 10.0
+  reward_response_time_weight: 1.0
+  reward_energy_consumption_weight: 0.5
+  bounds_file_path: "/config/bounds.yml"
+
+database:
+  file_path: "/data/db/"
+  file_name: "metrics-{{ROUTER_ID}}.duckdb"
+
+routing:
+  mab_model_path: null
+  mab_model_save_dir: "/data/mab"
+
+taskClassifier:
+  model_name: "sentence-transformers/all-MiniLM-L6-v2"
+  dataset_path: "/data/hf_datasets/"
+  temperature: 0.1

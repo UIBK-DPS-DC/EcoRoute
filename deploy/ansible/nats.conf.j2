@@ -1,0 +1,23 @@
+jetstream {}
+
+# Logging
+log_file: "{{ nats_log_location }}/nats-server.log"
+logtime: true
+
+cluster: {
+    name: {{ role }},
+    port:6222,
+    routes: [
+        "nats://{{ ansible_host }}:6222"
+    ]
+}
+
+gateway: {
+    name: {{ role }},
+    port: 7222,
+    gateways: [
+        {%- for gw_name, gw_host in router_map.items() %}
+        { name: {{ gw_name }}, url: "nats://{{ gw_host }}:7222" }{{ "," if not loop.last }}
+        {%- endfor %}
+    ]
+}

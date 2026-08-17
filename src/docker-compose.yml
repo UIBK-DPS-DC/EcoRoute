@@ -1,0 +1,109 @@
+version: "3.8"
+
+services:
+  nats-uc:
+    image: nats:2.10
+    command: -c /etc/my-server.conf --name nats_uc -p 4222 -m 8222
+    volumes:
+      - ./config/nats:/etc
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+      - "6222:6222"
+      - "7222:7222"
+  
+  nats-tacc:
+    image: nats:2.10
+    command: -c /etc/my-server.conf --name nats_tacc -p 4222 -m 8222
+    volumes:
+      - ./config/nats:/etc
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+      - "6222:6222"
+      - "7222:7222"
+  
+  nats-edge:
+    image: nats:2.10
+    command: -c /etc/my-server.conf --name nats_edge -p 4222 -m 8222
+    volumes:
+      - ./config/nats:/etc
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+      - "6222:6222"
+      - "7222:7222"
+
+  router-uc:
+    build: ./router
+    container_name: "router-uc"
+    environment:
+      - ROUTER_ID=router-uc
+      - NATS_URL=host.docker.internal
+      - SITE=uc
+    volumes:
+      - ./hf_datasets:/data/hf_datasets
+      - ./db:/data/db
+      - ./mab:/data/mab
+      - ./config/router:/config
+    env_file:
+      - ./config/env/.env
+    # depends_on:
+    #   - nats
+    ports:
+      - "8000:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  router-tacc:
+    build: ./router
+    container_name: "router-tacc"
+    environment:
+      - ROUTER_ID=router-tacc
+      - NATS_URL=host.docker.internal
+      - SITE=tacc
+    volumes:
+      - ./hf_datasets:/data/hf_datasets
+      - ./db:/data/db
+      - ./mab:/data/mab
+      - ./config/router:/config
+    env_file:
+      - ./config/env/.env
+    # depends_on:
+    #   - nats
+    ports:
+      - "8000:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  router-edge:
+    build: ./router
+    container_name: "router-edge"
+    environment:
+      - ROUTER_ID=router-edge
+      - NATS_URL=host.docker.internal
+      - SITE=edge
+    volumes:
+      - ./hf_datasets:/data/hf_datasets
+      - ./db:/data/db
+      - ./mab:/data/mab
+      - ./config/router:/config
+    env_file:
+      - ./config/env/.env
+    # depends_on:
+    #   - nats
+    ports:
+      - "8000:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  inference:
+    build: ./inference
+    environment:
+      - LLM_ID=${MODEL}
+      - NATS_URL=${NATS}
+      - SITE=${SITE}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # depends_on:
+    #   - nats

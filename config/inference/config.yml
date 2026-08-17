@@ -1,0 +1,12 @@
+model:
+  model_log_file: "app.log"
+  model_logging_level: "info"
+  heartbeat_interval_seconds: 10
+  max_concurrent_queries: 64
+  query_batch_size: 10
+  jetstream_query_fetch_timeout_seconds: 1
+  llm_request_timeout_seconds: 120.0
+  max_output_tokens: 1024
+
+energyTracker:
+  sample_interval_seconds: 0.01

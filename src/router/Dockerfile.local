@@ -1,0 +1,12 @@
+FROM router-base
+
+WORKDIR /app
+
+RUN apt-get update && \
+    apt-get install -y golang-go
+
+RUN go install github.com/nats-io/natscli/nats@latest
+
+COPY . .
+
+CMD ["uvicorn", "router.app:app", "--host", "0.0.0.0", "--port", "8000"]

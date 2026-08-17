@@ -1,0 +1,14 @@
+nats-py
+pydantic
+datasets==3.6.0
+sentence-transformers
+scipy
+fastapi
+uvicorn
+prettytable
+seaborn
+vowpalwabbit
+duckdb
+evaluate
+rouge_score
+nltk

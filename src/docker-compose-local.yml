@@ -1,0 +1,135 @@
+version: "3.8"
+
+services:
+  nats-uc:
+    image: nats:2.10
+    command: -c /etc/my-server.conf --name nats_uc -p 4222 -m 8222
+    volumes:
+      - ../config/nats/server-uc.conf:/etc/my-server.conf
+    ports:
+      - "4222"
+      - "8222"
+      - "6222"
+      - "7222"
+  
+  nats-tacc:
+    image: nats:2.10
+    command: -c /etc/my-server.conf --name nats_tacc -p 4222 -m 8222
+    volumes:
+      - ../config/nats/server-tacc.conf:/etc/my-server.conf
+    ports:
+      - "4222"
+      - "8222"
+      - "6222"
+      - "7222"
+
+  nats-edge:
+    image: nats:2.10
+    command: -c /etc/my-server.conf --name nats_edge -p 4222 -m 8222
+    volumes:
+      - ../config/nats/server-edge.conf:/etc/my-server.conf
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+      - "6222:6222"
+      - "7222:7222"
+
+  router-uc:
+    build:
+      context: ./router
+      dockerfile: Dockerfile.local
+    container_name: "router-uc"
+    environment:
+      - ROUTER_ID=router-uc
+      - NATS_URL=nats-uc
+      - SITE=uc
+      - HF_HOME=/models/huggingface
+    volumes:
+      - ./hf_datasets:/data/hf_datasets
+      - ./hf_models:/models/huggingface
+      - ../config/router:/config
+      - ../local/db:/data/db
+    depends_on:
+      - nats-uc
+    ports:
+      - "8000:8000"
+
+  router-tacc:
+    build:
+      context: ./router
+      dockerfile: Dockerfile.local
+    container_name: "router-tacc"
+    environment:
+      - ROUTER_ID=router-tacc
+      - NATS_URL=nats-tacc
+      - SITE=tacc
+      - HF_HOME=/models/huggingface
+    volumes:
+      - ./hf_datasets:/data/hf_datasets
+      - ./hf_models:/models/huggingface
+      - ../config/router:/config
+      - ../local/db:/data/db
+    depends_on:
+      - nats-tacc
+    ports:
+      - "8001:8000"
+
+  router-edge:
+    build:
+      context: ./router
+      dockerfile: Dockerfile.local
+    container_name: "router-edge"
+    environment:
+      - ROUTER_ID=router-edge
+      - NATS_URL=nats-edge
+      - SITE=edge
+      - HF_HOME=/models/huggingface
+    volumes:
+      - ./hf_datasets:/data/hf_datasets
+      - ./hf_models:/models/huggingface
+      - ../local/db:/data/db
+      # - ./mab:/data/mab
+      - ../config/router:/config
+    depends_on:
+      - nats-edge
+    ports:
+      - "8002:8000"
+
+  inference-nc:
+    build:
+      context: ./inference
+      dockerfile: Dockerfile.local
+    volumes:
+      - ../config/inference:/config
+    environment:
+      - NATS_URL=nats-uc
+      - SITE=uc
+      - LOCAL=true
+    depends_on:
+      - router-uc
+
+  inference-tacc:
+    build:
+      context: ./inference
+      dockerfile: Dockerfile.local
+    volumes:
+      - ../config/inference:/config
+    environment:
+      - NATS_URL=nats-tacc
+      - SITE=tacc
+      - LOCAL=true
+    depends_on:
+      - router-tacc
+
+  inference-edge:
+    build:
+      context: ./inference
+      dockerfile: Dockerfile.local
+    volumes:
+      - ../config/inference:/config
+    environment:
+      - NATS_URL=nats-edge
+      - SITE=edge
+      - LOCAL=true
+    depends_on:
+      - router-edge
