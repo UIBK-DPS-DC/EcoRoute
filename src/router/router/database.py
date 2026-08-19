@@ -30,7 +30,7 @@ class AvailableAction(BaseModel):
     def has_metrics(self) -> bool:
         return (
             self.mean_reward is not None
-            and self.mean_response_time is None
+            and self.mean_response_time is not None
             and self.mean_energy is not None
         )
 

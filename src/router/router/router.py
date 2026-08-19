@@ -373,6 +373,9 @@ class Router:
                 available_routers=available_routers,
             )
 
+            if query.has_reference():
+                await self._store_reference(query.query_id, query.reference)
+
             raise Exception("LLM response timeout")
 
         finally:

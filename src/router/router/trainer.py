@@ -46,7 +46,7 @@ class Trainer:
 
         self.metrics_map = {
             "squad": "f1",
-            "natural_questions": "f1",
+            "natural_questions": "rougeLsum",
             "mbpp": "pass_at_1",
             "gsm8k": "accuracy",
             "glue_sst2": "accuracy",
@@ -66,9 +66,12 @@ class Trainer:
                 "word_sorting": "exact_match",
             },
         }
-
-        with open(config.bounds_file_path, "r") as f:
-            self.bounds = yaml.safe_load(f)
+        try:
+            with open(config.bounds_file_path, "r") as f:
+                self.bounds = yaml.safe_load(f)
+        except FileNotFoundError:
+            logger.error("Bounds file not found")
+            self.bounds = {}
 
         logger.info("Trainer initialized")
 
@@ -235,14 +238,11 @@ class Trainer:
         references = [{"id": "0", "answers": label}]
 
         res = self.squad_metric.compute(predictions=predictions, references=references)
-        return res["f1"]
+        return res["f1"] / 100.0
 
     def _compute_natural_questions(self, response, label):
-        predictions = [{"id": "0", "prediction_text": response}]
-        references = [{"id": "0", "answers": {"text": label, "answer_start": [0]}}]
-
-        res = self.squad_metric.compute(predictions=predictions, references=references)
-        return res["f1"]
+        res = self.rouge.compute(predictions=[response], references=[label])
+        return res[self.metrics_map["natural_questions"]]
 
     def _compute_cnn_dailymail(self, response, label):
         res = self.rouge.compute(predictions=[response], references=[label])
@@ -262,17 +262,25 @@ class Trainer:
         return self._compute_accuracy(response, label)
 
     def _compute_gsm8k(self, response, label):
-        return self._compute_accuracy(
-            self.extract_last_number(response), self.extract_gsm8k_answer(label), float
-        )
+        prediction = self.extract_last_number(response)
+        reference = self.extract_gsm8k_answer(label)
+
+        if prediction is None or reference is None:
+            return 0.0
+
+        return self._compute_accuracy(prediction, reference, float)
 
     def _compute_bbh(self, response, label, subset):
         metric = self.accuracy
         metric_name = "accuracy"
 
         references = [label]
-        if subset == "object_counting":
-            preds = [float(self.extract_last_number(response))]
+        if subset == "object_counting" or subset == "multistep_arithmetic_two":
+            last_number = self.extract_last_number(response)
+            if last_number is None:
+                preds = [last_number]
+            else:
+                preds = [float(self.extract_last_number(response))]
         elif (
             subset == "hyperbaton"
             or subset == "logical_deduction_seven_objects"
@@ -285,8 +293,6 @@ class Trainer:
             preds = [self.extract_last_validity(response)]
             metric = self.exact_match
             metric_name = "exact_match"
-        elif subset == "multistep_arithmetic_two":
-            preds = [float(self.extract_last_number(response))]
         elif subset == "boolean_expressions":
             preds = [self.extract_last_boolean(response)]
             references = [label.lower()]
@@ -305,7 +311,10 @@ class Trainer:
 
     def _compute_mbpp(self, response, label):
         code, function_name = self.extract_python_code(response)
-        res = self.run_code_with_tests(code, function_name, label)
+
+        label_converted = json.loads(label)
+
+        res = self.run_code_with_tests(code, function_name, label_converted)
         return self.pass_at_k([e["passed"] for e in res])
 
     def _compute_accuracy(self, response, label, casting_class=int):
@@ -329,12 +338,12 @@ class Trainer:
 
     def extract_last_number(self, text):
         numbers = re.findall(r"-?\d+\.?\d*", text)
-        return numbers[-1] if numbers else -1
+        return numbers[-1] if numbers else None
 
     def extract_last_choice(self, text):
         """
         Returns the last occurrence of (X) or X) where X is A-Z.
-        Returns just the letter (e.g., 'A'), or None if not found.
+        Returns just the letter (e.g., 'A'), or 'Z' if not found.
         """
         pattern = r"(?:\(([A-Z])\)|([A-Z])\))"
 
@@ -362,8 +371,8 @@ class Trainer:
 
     def extract_last_boolean(self, text):
         """
-        Returns the last occurrence of 'valid' or 'invalid' (case-insensitive).
-        Returns 'valid', 'invalid', or None if not found.
+        Returns the last occurrence of 'true' or 'false' (case-insensitive).
+        Returns 'true', 'false', or None if not found.
         """
         pattern = r"\b(true|false)\b"
 
@@ -371,8 +380,8 @@ class Trainer:
 
     def _extract_last_word(self, text, pattern):
         """
-        Returns the last occurrence of 'valid' or 'invalid' (case-insensitive).
-        Returns 'valid', 'invalid', or None if not found.
+        Returns the last occurrence of the pattern given (case-insensitive).
+        Returns the match, or None if not found.
         """
 
         matches = re.findall(pattern, text, flags=re.IGNORECASE)
@@ -404,7 +413,7 @@ class Trainer:
             (code: str | None, function_name: str | None)
         """
         # --- Step 1: extract code block ---
-        pattern = r"```python\s*(.*?)```"
+        pattern = r"\`\`\`python\s*(.*?)\`\`\`"
         match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
 
         if not match:
@@ -457,9 +466,11 @@ class Trainer:
                 # fallback: leave unchanged if parsing fails
                 updated_tests.append(test)
 
+        print(tests)
+        print(updated_tests)
         return updated_tests
 
-    def run_code_with_tests(self, code, function_name, tests, timeout=3):
+    def run_code_with_tests(self, code, function_name, tests: list, timeout=3):
         tests = self._replace_function_name_in_tests(tests, function_name)
 
         def target(queue):
