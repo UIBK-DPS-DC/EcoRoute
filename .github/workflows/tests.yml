@@ -2,9 +2,7 @@ name: Python Tests
 
 on:
   push:
-    branches:
-      - main
-      - setup-ci
+    branches: [main]
   pull_request:
     branches: [main]
 
