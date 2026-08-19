@@ -1,5 +1,10 @@
 # EcoRoute
 
+[![Tests](https://github.com/UIBK-DPS-DC/EcoRoute/actions/workflows/tests.yml/badge.svg)](https://github.com/UIBK-DPS-DC/EcoRoute/actions/workflows/tests.yml)
+![Python](https://img.shields.io/badge/python-3.12-blue)
+![Version](https://img.shields.io/badge/version-0.1.0-blue)
+[![pytest](https://img.shields.io/badge/tested%20with-pytest-0A9EDC.svg)](https://pytest.org/)
+
 EcoRoute is a multi-task Large Language Model routing framwork. It employs a collection of expert SLMs and LLMs to solve for different tasks in the Edge/Cloud-Continuum. It uses a Multi-Armed-Bandit approach to maintain high output accuracy while reducing response time and energy consumption, and balancing the workflow among the models. 
 
 ## Quickstart
