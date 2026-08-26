@@ -45,7 +45,7 @@ async def route_query(request: QueryRequest):
         response = await router.handle_query(query)
         logger.info(f"Received response to send to user: {response}")
     except Exception as e:
-        logger.warning(f"handle_query threw an exception: {e}")
+        logger.exception(f"handle_query threw an exception")
         return "Error: Internal Server Error"
 
     if response is None:

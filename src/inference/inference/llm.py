@@ -86,28 +86,32 @@ async def call_vllm_remote(prompt, active_queries=None):
 async def call_vllm_local(prompt, active_queries=None):
 
     latency = random.gauss(performance["latency"]["mu"], performance["latency"]["std"])
+
     logger.info(f"Waiting for {latency} seconds")
 
     if active_queries is None:
         await asyncio.sleep(latency)
     else:
         # Simulating query congestion under high workload
-        await asyncio.sleep(latency + 1.2**active_queries)
+        # await asyncio.sleep(latency + 1.2**active_queries)
+        await asyncio.sleep(latency)
 
-    return {
-        "choices": [
-            {
-                "text": "Lorem ipsum dolor sit amet, "
-                "consetetur sadipscing elitr, sed diam "
-                "nonumy eirmod tempor invidunt ut labore "
-                "et dolore magna aliquyam erat, sed diam "
-                "voluptua. At vero eos et accusam et justo "
-                "duo dolores et ea rebum. Stet clita kasd "
-                "gubergren, no sea takimata sanctus est "
-                "Lorem ipsum dolor sit amet."
-            }
-        ]
-    }
+    return {"choices": [{"text": json.dumps(performance["tasks"])}]}
+
+    # return {
+    #     "choices": [
+    #         {
+    #             "text": "Lorem ipsum dolor sit amet, "
+    #             "consetetur sadipscing elitr, sed diam "
+    #             "nonumy eirmod tempor invidunt ut labore "
+    #             "et dolore magna aliquyam erat, sed diam "
+    #             "voluptua. At vero eos et accusam et justo "
+    #             "duo dolores et ea rebum. Stet clita kasd "
+    #             "gubergren, no sea takimata sanctus est "
+    #             "Lorem ipsum dolor sit amet."
+    #         }
+    #     ]
+    # }
 
 
 call_vllm = call_vllm_local if LOCAL else call_vllm_remote
@@ -238,7 +242,7 @@ async def worker():
     for task in tasks:
         performance["tasks"][task] = {
             "mu": random.uniform(0.0, 1.0),
-            "std": random.uniform(0.05, 0.3),
+            "std": random.uniform(0.05, 0.07),
         }
 
     registration = {"llm_id": LLM_ID_CLEANED, "performance": performance}

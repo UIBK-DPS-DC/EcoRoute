@@ -4,24 +4,28 @@ router:
   use_task_classification: true
   router_log_file: "/data/db/"
   router_logging_level: "info"
-  query_timeout: 30.0
+  query_timeout: 60.0
 
 trainer:
   training_interval_threshold_seconds: 10
   training_batch_size: 10
   normalizer: "mean"
-  reward_output_quality_weight: 10.0
+  reward_output_quality_weight: 1.0
   reward_response_time_weight: 1.0
   reward_energy_consumption_weight: 0.5
   bounds_file_path: "/config/bounds.yml"
+  dummy_output_quality: true
 
 database:
   file_path: "/data/db/"
   file_name: "metrics-{{ROUTER_ID}}.duckdb"
 
 routing:
+  algorithm: "heuristic"
   mab_model_path: null
   mab_model_save_dir: "/data/mab"
+  mab_options: ""
+  heuristic_epsilon: 0.1
 
 taskClassifier:
   model_name: "sentence-transformers/all-MiniLM-L6-v2"

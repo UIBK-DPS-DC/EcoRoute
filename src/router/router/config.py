@@ -12,8 +12,11 @@ class RouterConfig(BaseModel):
 
 
 class RoutingConfig(BaseModel):
+    algorithm: str = "mab"
     mab_model_path: str | None = None
     mab_model_save_dir: str = "/data/mab"
+    mab_options: str = ""
+    heuristic_epsilon: float = 0.1
 
 
 class DatabaseConfig(BaseModel):
@@ -29,6 +32,7 @@ class TrainerConfig(BaseModel):
     reward_response_time_weight: float = 0.5
     reward_energy_consumption_weight: float = 0.5
     bounds_file_path: str = "/config/bounds.yml"
+    dummy_output_quality: bool = False
 
 
 class TaskClassifierConfig(BaseModel):

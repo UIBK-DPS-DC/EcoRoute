@@ -4,6 +4,7 @@ import json
 import logging
 import math
 import multiprocessing
+import random
 import re
 import time
 import traceback
@@ -28,6 +29,7 @@ class Trainer:
     ):
         self.duckdb = duckdb
         self.routing = routing
+        self.config = config
         self.training_interval_threshold = config.training_interval_threshold_seconds
         self.batch_size = config.training_batch_size
         self.time_since_last_training = time.perf_counter()
@@ -104,17 +106,40 @@ class Trainer:
         self, normalized_output_quality, response_time, energy_consumption, failed
     ):
         if failed:
-            return -10.0
+            return -1.0
         time_component = 1.0 / (1 + math.exp((response_time - 10.0) / 3))
 
+        return self.output_quality_weight * (normalized_output_quality)
         return (self.output_quality_weight * normalized_output_quality) * (
             self.response_time_weight * time_component
         )
         # - self.energy_consumption_weight * energy_consumption
 
+    def _compute_dummy_output_quality(self, training_sample: TrainingSample):
+        """
+        Only for local deployment: Randomly draws output quality
+        from mean and standard deviation extracted from LLMs response
+        """
+
+        response = training_sample.response
+
+        performance = json.loads(response)
+        mu = performance[training_sample.task]["mu"]
+        std = performance[training_sample.task]["std"]
+
+        output_quality = random.gauss(mu, std)
+        if output_quality > 1.0:
+            output_quality = 1.0
+        if output_quality < 0.0:
+            output_quality = 0.0
+
+        return output_quality, output_quality
+
     def _compute_output_quality(self, training_sample: TrainingSample):
         if training_sample.failed():
             return 0.0, 0.0
+        if self.config.dummy_output_quality:
+            return self._compute_dummy_output_quality(training_sample)
 
         response = training_sample.response
         target = training_sample.target
@@ -305,7 +330,8 @@ class Trainer:
             metric_name = "exact_match"
 
         if None in preds:
-            preds = ["none"]
+            return 0.0
+
         res = metric.compute(predictions=preds, references=references)
         return res[metric_name]
 

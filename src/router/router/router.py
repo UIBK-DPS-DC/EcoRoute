@@ -12,7 +12,7 @@ from .classification import Classifier
 from .config import AppConfig
 from .database import AvailableModel, AvailableRouter, DuckDB
 from .models import PendingRequest, Query, QueryTimes
-from .routing import Routing
+from .routing import Routing, get_algorithm
 from .trainer import Trainer
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ class Router:
         self.task_classifier = task_classifier
         self.pending_requests: dict[str, PendingRequest] = {}
         self.pending_requests_per_llm: dict[str, int] = {}
-        self.routing = Routing(config.routing)
+        self.routing = get_algorithm(config.routing)
         self.duckdb = DuckDB(config.database, self.router_id)
         self.trainer = Trainer(self.duckdb, self.routing, config.trainer)
         self.model_ttl = self.config.model_ttl
