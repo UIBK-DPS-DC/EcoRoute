@@ -427,6 +427,37 @@ class DuckDB:
 
         return [RouterPerformance.model_validate(row) for row in rows]
 
+    def get_mean_output_quality_for_task(self, task: str):
+        return self._get_mean_metric_for_task(task, "output_quality")
+
+    def get_mean_energy_for_task(self, task: str):
+        return self._get_mean_metric_for_task(task, "energy")
+
+    def get_mean_response_time_for_task(self, task: str):
+        return self._get_mean_metric_for_task(task, "response_time")
+
+    def _get_mean_metric_for_task(self, task: str, metric: str):
+        con = duckdb.connect(self.db_file)
+
+        params = [task]
+
+        rows = (
+            con.execute(
+                f"""
+            SELECT
+                AVG(m.{metric}) AS {metric}
+            FROM metrics m
+            WHERE m.task = ?
+            GROUP BY m.task
+            """,
+                parameters=params,
+            )
+            .fetch_arrow_table()
+            .to_pylist()
+        )
+        logger.info(f"Mean {metric}: {rows[0][metric]}")
+        return rows[0][metric]
+
     def set_processed(self, training_batch: List[TrainingSample]):
         params = [
             [

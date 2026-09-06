@@ -7,6 +7,7 @@ import multiprocessing
 import re
 import time
 import traceback
+import numpy as np
 
 import evaluate
 import yaml
@@ -101,16 +102,44 @@ class Trainer:
         return self.normalizer.normalize(bounds, value)
 
     def compute_reward(
-        self, normalized_output_quality, response_time, energy_consumption, failed
+        self,
+        normalized_output_quality,
+        response_time,
+        energy_consumption,
+        mean_output_quality,
+        mean_response_time,
+        mean_energy,
+        pending_queries,
+        failed,
     ):
         if failed:
-            return -10.0
-        time_component = 1.0 / (1 + math.exp((response_time - 10.0) / 3))
+            return -1.0
 
-        return (self.output_quality_weight * normalized_output_quality) * (
-            self.response_time_weight * time_component
+        if mean_output_quality is None:
+            logger.warning("Mean output quality is not available")
+        elif normalized_output_quality < (0.75 * mean_output_quality):
+            return -1.0
+
+        time_component = np.log((response_time / mean_response_time))
+
+        energy_component = np.log((energy_consumption / mean_energy))
+
+        efficiency = -0.5 * time_component - 0.5 * energy_component
+
+        utilization = math.exp(-0.1 * pending_queries)
+
+        efficiency = max(-1.0, min(1.0, efficiency))
+
+        reward = (
+            utilization * self.output_quality_weight * normalized_output_quality
+            + 0.1 * efficiency
         )
-        # - self.energy_consumption_weight * energy_consumption
+
+        logger.info(
+            f"compute reward: {response_time=} {time_component=} {energy_consumption=} {energy_component=} {reward=}"
+        )
+
+        return reward
 
     def _compute_output_quality(self, training_sample: TrainingSample):
         if training_sample.failed():
@@ -166,6 +195,26 @@ class Trainer:
         dataset = training_sample.dataset
         subset = training_sample.subset
 
+        mean_energy = self.duckdb.get_mean_energy_for_task(training_sample.task)
+        mean_response_time = self.duckdb.get_mean_response_time_for_task(
+            training_sample.task
+        )
+        mean_output_quality = self.duckdb.get_mean_output_quality_for_task(
+            training_sample.task
+        )
+
+        pending_queries = None
+        for model in training_sample.available_models:
+            if training_sample.llm_id == model.id:
+                pending_queries = model.pending_requests
+                break
+
+        if pending_queries is None:
+            for router in training_sample.available_routers:
+                if training_sample.llm_id == router.id:
+                    pending_queries = router.pending_requests
+                    break
+
         normalized_output_quality, output_quality = self._compute_output_quality(
             training_sample
         )
@@ -176,14 +225,19 @@ class Trainer:
 
         normalized_energy = 1.0
         if not training_sample.failed():
-            normalized_energy = self.normalize_metric(
-                training_sample.energy, "energy", dataset, subset
-            )
+            # normalized_energy = self.normalize_metric(
+            #     training_sample.energy, "energy", dataset, subset
+            # )
+            normalized_energy = training_sample.energy
 
         reward = self.compute_reward(
             output_quality,
             training_sample.response_time,
             normalized_energy,
+            mean_output_quality,
+            mean_response_time,
+            mean_energy,
+            pending_queries,
             training_sample.failed(),
         )
 

@@ -6,3 +6,4 @@ python-dotenv
 amdsmi==6.3.3
 psutil
 pydantic
+docker

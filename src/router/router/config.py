@@ -14,6 +14,7 @@ class RouterConfig(BaseModel):
 class RoutingConfig(BaseModel):
     mab_model_path: str | None = None
     mab_model_save_dir: str = "/data/mab"
+    mab_options: str = "--epsilon 0.1"
 
 
 class DatabaseConfig(BaseModel):

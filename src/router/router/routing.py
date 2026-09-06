@@ -15,6 +15,9 @@ logger = logging.getLogger(__name__)
 class Routing:
     def __init__(self, config: RoutingConfig):
         self.save_dir = config.mab_model_save_dir
+
+        mab_options = " ".join(["--cb_explore_adf -q TM", config.mab_options])
+
         if config.mab_model_path is None:
             self.vw = vowpalwabbit.Workspace("--cb_explore_adf", quiet=True)
         else:
@@ -61,7 +64,7 @@ class Routing:
         context_string = " ".join(
             [f"{cont}:{value}" for cont, value in context.items()]
         )
-        shared_features = f"shared | {context_string}"
+        shared_features = f"shared |Task {context_string}"
         action_string = self._create_actions_string(
             router_library=router_library,
             llm_library=llm_library,
@@ -129,8 +132,9 @@ class Routing:
                 action_context = f"mean_reward={action.mean_reward} mean_response_time={action.mean_response_time} mean_energy={action.mean_energy}"
 
             action_context += f" pending_requests={action.pending_requests}"
+            # action_context = ""
 
             action_strings.append(
-                f"{training_string}| {id_name}={action.id} {action_context}"
+                f"{training_string}|Model {id_name}={action.id} {action_context}"
             )
         return "\n".join(action_strings)

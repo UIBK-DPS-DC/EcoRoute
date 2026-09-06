@@ -108,12 +108,12 @@
     # - name: Purge all streams
     #   command: "nats stream purge {{ item }} --force"
     #   loop: "{{ stream_names }}"
-    - name: Purge all streams
-      command: "nats stream purge {{ item }} --force"
-      loop:
-        - "ROUTING_REQUESTS"
-        - "ROUTING_RESPONSE"
-        - "ROUTING_REQUESTS_ROUTER"
+    # - name: Purge all streams
+    #   command: "nats stream purge {{ item }} --force"
+    #   loop:
+    #     - "ROUTING_REQUESTS"
+    #     - "ROUTING_RESPONSE"
+    #     - "ROUTING_REQUESTS_ROUTER"
 
     - name: Find duckdb files
       ansible.builtin.find:

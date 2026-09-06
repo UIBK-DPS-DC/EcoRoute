@@ -196,7 +196,7 @@ def test_learn(models, routers):
             ],
             [],
             None,
-            "shared | task:classification\n| model=12345 mean_reward=5.0 mean_response_time=5.0 mean_energy=5.0 pending_requests=5\n| model=23456 mean_reward=10.0 mean_response_time=1.0 mean_energy=2.0 pending_requests=0\n",
+            "shared |Task task:classification\n|Model model=12345 mean_reward=5.0 mean_response_time=5.0 mean_energy=5.0 pending_requests=5\n|Model model=23456 mean_reward=10.0 mean_response_time=1.0 mean_energy=2.0 pending_requests=0\n",
         ),
         (
             [
@@ -225,7 +225,7 @@ def test_learn(models, routers):
                 )
             ],
             {"23456": {"cost": 12.0, "prob": 0.75}},
-            "shared | task:classification\n| model=12345 mean_reward=5.0 mean_response_time=5.0 mean_energy=5.0 pending_requests=5\n1:12.0:0.75 | model=23456 mean_reward=10.0 mean_response_time=1.0 mean_energy=2.0 pending_requests=0\n| router=98765  pending_requests=2",
+            "shared |Task task:classification\n|Model model=12345 mean_reward=5.0 mean_response_time=5.0 mean_energy=5.0 pending_requests=5\n1:12.0:0.75 |Model model=23456 mean_reward=10.0 mean_response_time=1.0 mean_energy=2.0 pending_requests=0\n|Model router=98765  pending_requests=2",
         ),
     ],
 )

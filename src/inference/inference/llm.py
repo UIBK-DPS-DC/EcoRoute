@@ -1,19 +1,20 @@
-import logging
-
-
 import asyncio
 import json
+import logging
 import os
 import random
+import socket
 import time
 import uuid
 
+import docker
 import httpx
 from dotenv import load_dotenv
 from energy_tracker import EnergyTracker
 from nats.aio.client import Client as NATS
 from nats.errors import TimeoutError
 from nats.js.errors import NoStreamResponseError
+
 from config import load_config
 
 
@@ -36,16 +37,27 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
+client = docker.from_env()
+
+container_id = socket.gethostname()
+container = client.containers.get(container_id)
+
+print(container.name)
+
 NATS_URL = os.getenv("NATS_URL", "nats")
 SITE = os.getenv("SITE", "uc")
 LOCAL = os.getenv("LOCAL", False)
 
 LLM_ID = os.getenv("LLM_ID", None)
 
+LLM_ID = container.name
+
 if LLM_ID is None:
     LLM_ID = f"{SITE}-{uuid.uuid4()}"
 
 LLM_ID_CLEANED = convert_llm_id(LLM_ID)
+
+random.seed("97" + LLM_ID)
 
 heartbeat_interval = config.model.heartbeat_interval_seconds
 
@@ -53,6 +65,11 @@ logger.info(f"{LLM_ID=}, {NATS_URL=}")
 
 semaphore = asyncio.Semaphore(config.model.max_concurrent_queries)
 tracker = EnergyTracker(config.energy_tracker)
+
+
+instance_odd = False
+if "1" in LLM_ID:
+    instance_odd = True
 
 
 def create_request(prompt):
@@ -92,7 +109,10 @@ async def call_vllm_local(prompt, active_queries=None):
         await asyncio.sleep(latency)
     else:
         # Simulating query congestion under high workload
-        await asyncio.sleep(latency + 1.2**active_queries)
+        await asyncio.sleep(latency + 1.1**active_queries)
+        # await asyncio.sleep(latency)
+
+    return {"choices": [{"text": json.dumps(performance["tasks"])}]}
 
     return {
         "choices": [
@@ -200,6 +220,7 @@ async def worker():
         "coding",
         "reasoning",
     ]
+    odds = [True, True, False, False, False]
 
     latency_mu_min = 5.0
     latency_mu_max = 9.0
@@ -235,7 +256,17 @@ async def worker():
         f"Performance setting: {latency_mu_min=}, {latency_mu_max=}, {latency_std_min=}, {latency_std_max=} | {performance['latency']['mu']=}, {performance['latency']['std']=}"
     )
 
-    for task in tasks:
+    for task, odd in zip(tasks, odds):
+
+        # mu = 0.1
+        # std = 0.05
+        # if instance_odd == odd:
+        #     mu = 0.9
+        #     std = 0.05
+        # performance["tasks"][task] = {
+        #     "mu": mu,
+        #     "std": std,
+        # }
         performance["tasks"][task] = {
             "mu": random.uniform(0.0, 1.0),
             "std": random.uniform(0.05, 0.3),

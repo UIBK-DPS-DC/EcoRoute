@@ -4,5 +4,8 @@ WORKDIR /app
 
 COPY . .
 
+
+RUN pip install docker
+
 CMD ["python", "inference/llm.py"]
 

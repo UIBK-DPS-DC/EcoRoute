@@ -182,8 +182,8 @@ class Router:
         # Otherwise the original router learns to send queries to router B through router A
         # instead of sending to B directly
         available_routers = []
-        if not query.sent_from_router():
-            available_routers = self._get_available_routers(context["task"])
+        # if not query.sent_from_router():
+        #     available_routers = self._get_available_routers(context["task"])
 
         for model in possible_models:
             model.pending_requests = 0
@@ -427,6 +427,9 @@ class Router:
         logger.info(f"Model response publish time: {response['publish_time']}")
         logger.info(f"Response receive time: {response['router_receive_time']}")
         logger.info(f"Future complete time: {future_complete_time}")
+
+        if float(response["energy"]) < 0.0:
+            logger.warning(f"Faulty energy readings: {float(response['energy'])}")
 
         await self._store_query(
             query.query_id,

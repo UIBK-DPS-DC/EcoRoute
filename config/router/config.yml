@@ -20,9 +20,12 @@ database:
   file_name: "metrics-{{ROUTER_ID}}.duckdb"
 
 routing:
+  algorithm: "mab"
   mab_model_path: null
   mab_model_save_dir: "/data/mab"
-
+  mab_options: "--epsilon 0.1"
+  heuristic_epsilon: 0.1
+  
 taskClassifier:
   model_name: "sentence-transformers/all-MiniLM-L6-v2"
   dataset_path: "/data/hf_datasets/"

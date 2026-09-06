@@ -95,12 +95,13 @@ services:
     ports:
       - "8002:8000"
 
-  inference-nc:
+  inference-uc:
     build:
       context: ./inference
       dockerfile: Dockerfile.local
     volumes:
       - ../config/inference:/config
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - NATS_URL=nats-uc
       - SITE=uc
@@ -114,6 +115,7 @@ services:
       dockerfile: Dockerfile.local
     volumes:
       - ../config/inference:/config
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - NATS_URL=nats-tacc
       - SITE=tacc
@@ -127,6 +129,7 @@ services:
       dockerfile: Dockerfile.local
     volumes:
       - ../config/inference:/config
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - NATS_URL=nats-edge
       - SITE=edge
