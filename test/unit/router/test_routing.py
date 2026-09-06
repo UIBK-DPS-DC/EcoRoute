@@ -175,7 +175,7 @@ def test_learn(models, routers):
             ],
             [],
             None,
-            "shared | task:classification\n| model=12345 mean_reward=5.0 mean_response_time=5.0 mean_energy=5.0 pending_requests=5\n",
+            "shared |Task task:classification\n|Model model=12345 mean_reward=5.0 mean_response_time=5.0 mean_energy=5.0 pending_requests=5\n",
         ),
         (
             [
