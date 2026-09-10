@@ -238,7 +238,8 @@ class Routing(RoutingAlgorithm):
             if action.has_metrics():
                 action_context = f"mean_reward={action.mean_reward} mean_response_time={action.mean_response_time} mean_energy={action.mean_energy}"
 
-            action_context += f" pending_requests={action.pending_requests}"
+            # action_context += f" pending_requests={action.pending_requests}"
+            action_context = f"pending_requests={action.pending_requests}"
             # action_context = ""
 
             action_strings.append(

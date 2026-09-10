@@ -5,6 +5,7 @@ import os
 import re
 import time
 from glob import glob
+from eval_openrouter import send_at_rate_openrouter
 
 import httpx
 import pandas as pd
@@ -57,7 +58,7 @@ async def send_request(client, request):
 async def send_at_rate(df, rps):
     interval = 1.0 / rps
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=httpx.Timeout(None)) as client:
         start = time.perf_counter()
         tasks = []
 
@@ -132,6 +133,10 @@ exceptions = args.skip
 
 num_samples = int(args.num * 60 * args.time)
 
+sending = send_at_rate
+if "openrouter" in URL:
+    sending = send_at_rate_openrouter
+
 datasets = []
 
 
@@ -183,4 +188,4 @@ for file in glob(os.path.join(data_path, "prepared-*.pkl")):
 combined = pd.concat(total_samples, ignore_index=True)
 combined = combined.sample(frac=1, random_state=42).reset_index(drop=True)
 
-asyncio.run(send_at_rate(combined, args.num))
+asyncio.run(sending(combined, args.num))

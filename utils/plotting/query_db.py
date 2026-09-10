@@ -9,6 +9,7 @@ from plots import (
     get_metrics_query,
     plot_basic_metrics_scatter,
     plot_model_utilization,
+    plot_moving_avg,
     plot_output_quality_analysis,
     plot_task_classification,
 )
@@ -48,7 +49,7 @@ pattern = re.compile(r"(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})$")
 l = sorted([d for d in base_dir.iterdir() if d.is_dir() and pattern.search(d.name)])
 
 
-df_to_select = 1
+df_to_select = 4
 
 latest_dir = max(
     (d for d in base_dir.iterdir() if d.is_dir() and pattern.search(d.name)),
@@ -147,9 +148,10 @@ df = con.execute(query).fetchdf()
 print(df.iloc[df["reward"].idxmax()])
 
 plot_basic_metrics_scatter(df)
-# plot_output_quality_analysis(df)
+plot_moving_avg(df)
+plot_output_quality_analysis(df)
 # plot_task_classification(df)
-plot_model_utilization(df)
+# plot_model_utilization(df)
 assert False
 
 # c_not_found = 0
