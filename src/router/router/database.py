@@ -49,6 +49,7 @@ class AvailableModel(AvailableAction):
 
 class TrainingSample(BaseModel):
     query_id: str
+    prompt: str
     timestamp: datetime
     llm_id: str
     site: str
@@ -83,6 +84,7 @@ class DuckDB:
         self.con.execute("""
     CREATE TABLE IF NOT EXISTS metrics (
         query_id VARCHAR,
+        prompt VARCHAR,
         timestamp TIMESTAMP,
         llm_id VARCHAR,
         site VARCHAR,
@@ -195,6 +197,7 @@ class DuckDB:
     def insert(
         self,
         query_id,
+        prompt,
         llm_id,
         site,
         task,
@@ -214,6 +217,7 @@ class DuckDB:
 
         params = [
             query_id,
+            prompt,
             datetime.now(),
             llm_id,
             site,
@@ -228,7 +232,7 @@ class DuckDB:
             processed,
         ]
         con.execute(
-            f"INSERT INTO metrics (query_id, timestamp, llm_id, site, task, response, response_time, network_time, routing_time, execution_time, energy, routing_confidence, processed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            f"INSERT INTO metrics (query_id, prompt, timestamp, llm_id, site, task, response, response_time, network_time, routing_time, execution_time, energy, routing_confidence, processed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             parameters=params,
         )
         self.metrics_since_last_training_batch += 1

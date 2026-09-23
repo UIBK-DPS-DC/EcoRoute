@@ -322,6 +322,7 @@ def test_compute_output_quality_without_expected_result(
 def _get_output_quality(trainer, task, response, target, dataset, subset):
     training_sample = TrainingSample(
         query_id="12345",
+        prompt="",
         timestamp=datetime.now(),
         llm_id="987654",
         site="edge",

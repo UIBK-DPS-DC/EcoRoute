@@ -21,11 +21,28 @@ database:
   file_name: "metrics-{{ROUTER_ID}}.duckdb"
 
 routing:
-  algorithm: "mab"
-  mab_model_path: null
-  mab_model_save_dir: "/data/mab"
-  mab_options: "--epsilon 0.1"
-  heuristic_epsilon: 0.1
+  algorithm: "mlp"
+  model_path: null
+  model_save_dir: "/data/mab"
+  training_data_path: "/data/routerbench/training_data.pkl"
+  embedding_model: "all-MiniLM-L12-v2" 
+  
+  mab:
+    mab_options: "--epsilon 0.1"
+  
+  heuristic:
+    heuristic_epsilon: 0.1
+  
+  knn:
+    n_neighbors: 50
+    distance_metric: "cosine"
+    leaf_size: 30
+  
+  mlp:
+    hidden_layer_sizes: [100, 100, 100]
+    activation_function: "relu"
+    learning_rate_method: "constant"
+    learning_rate: 0.001
   
 taskClassifier:
   model_name: "sentence-transformers/all-MiniLM-L6-v2"

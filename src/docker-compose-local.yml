@@ -49,6 +49,7 @@ services:
       - ./hf_models:/models/huggingface
       - ../config/router:/config
       - ../local/db:/data/db
+      - ../data/routerbench:/data/routerbench
     depends_on:
       - nats-uc
     ports:
@@ -69,6 +70,7 @@ services:
       - ./hf_models:/models/huggingface
       - ../config/router:/config
       - ../local/db:/data/db
+      - ../data/routerbench:/data/routerbench
     depends_on:
       - nats-tacc
     ports:
@@ -87,9 +89,10 @@ services:
     volumes:
       - ./hf_datasets:/data/hf_datasets
       - ./hf_models:/models/huggingface
-      - ../local/db:/data/db
-      # - ./mab:/data/mab
       - ../config/router:/config
+      - ../local/db:/data/db
+      - ../data/routerbench:/data/routerbench
+      # - ./mab:/data/mab
     depends_on:
       - nats-edge
     ports:

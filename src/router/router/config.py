@@ -1,5 +1,6 @@
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
+from typing import Literal
 
 
 class RouterConfig(BaseModel):
@@ -11,12 +12,49 @@ class RouterConfig(BaseModel):
     query_timeout: float = 600.0
 
 
-class RoutingConfig(BaseModel):
-    algorithm: str = "mab"
-    mab_model_path: str | None = None
-    mab_model_save_dir: str = "/data/mab"
+class MABRoutingConfig(BaseModel):
     mab_options: str = "--epsilon 0.1"
+
+
+class HeuristicRoutingConfig(BaseModel):
     heuristic_epsilon: float = 0.1
+
+
+class KNNRoutingConfig(BaseModel):
+    n_neighbors: int = 50
+    distance_metric: str = "cosine"
+    leaf_size: int = 30
+
+
+class MLPRoutingConfig(BaseModel):
+    hidden_layer_sizes: list[int] = (100, 100, 100)
+    activation_function: str = "relu"
+    learning_rate_method: str = "constant"
+    learning_rate: float = 0.001
+
+
+class RoutingConfig(BaseModel):
+    algorithm: Literal["mab", "heuristic", "knn", "mlp"] = "mab"
+    model_path: str | None = None
+    model_save_dir: str = "/data/mab"
+    training_data_path: str = "/data/routerbench/training_data.pkl"
+    embedding_model: str = "all-MiniLM-L12-v2"
+    mab: MABRoutingConfig | None = MABRoutingConfig()
+    heuristic: HeuristicRoutingConfig | None = None
+    knn: KNNRoutingConfig | None = None
+    mlp: MLPRoutingConfig | None = None
+
+    @model_validator(mode="after")
+    def validate_selected_algorithm(self):
+        config = getattr(self, self.algorithm)
+
+        if config is None:
+            raise ValueError(
+                f"Configuration for selected algorithm "
+                f"'{self.algorithm}' is missing"
+            )
+
+        return self
 
 
 class DatabaseConfig(BaseModel):

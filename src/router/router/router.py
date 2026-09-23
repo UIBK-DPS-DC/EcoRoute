@@ -42,6 +42,9 @@ class Router:
         self.heartbeat_interval = self.config.router_heartbeat_interval_seconds
         logger.info("Router initialized")
 
+        # Just for RouterBench testing
+        self.queries_seen = {}
+
     async def init(self):
         logger.info("Creating bucket LLM_REGISTRY...")
         self.llm_kv = await self.create_kv_bucket("LLM_REGISTRY")
@@ -61,6 +64,11 @@ class Router:
             self.register_task(interval_seconds=self.heartbeat_interval)
         )
         logger.info("Router all tasks started")
+
+        while not self.routing.model_ready():
+            await asyncio.sleep(1.0)
+
+        logger.info("Routing model ready")
 
     async def create_kv_bucket(self, bucket):
         try:
@@ -196,7 +204,7 @@ class Router:
                 router.pending_requests = pending_requests_per_llm[router.id]
 
         selection_probs = self.routing.predict(
-            available_routers, possible_models, context
+            available_routers, possible_models, context, query.query
         )
         logger.info(f"Model selection probabilities = {selection_probs}")
 
@@ -293,6 +301,21 @@ class Router:
 
         selection, prob, context, possible_models, available_routers = routing_result
 
+        # if query.query not in self.queries_seen:
+        #     self.queries_seen[query.query] = []
+
+        # selected = False
+        # for m in possible_models:
+        #     if m.id not in self.queries_seen[query.query]:
+        #         selection = m
+        #         self.queries_seen[query.query].append(m.id)
+        #         selected = True
+        #         break
+        # if selected == False:
+        #     logger.warning(
+        #         f"SELECTION PROCCESS FAILED: {self.queries_seen[query.query]}"
+        #     )
+
         routing_time = time.perf_counter() - routing_start_time
 
         if isinstance(selection, AvailableRouter):
@@ -360,6 +383,7 @@ class Router:
 
             await self._store_query(
                 id=query.query_id,
+                prompt=query.query,
                 llm_id=selection_id,
                 task=context["task"],
                 response=None,
@@ -433,6 +457,7 @@ class Router:
 
         await self._store_query(
             query.query_id,
+            query.query,
             selection_id,
             context["task"],
             response["output"],
@@ -489,6 +514,7 @@ class Router:
     async def _store_query(
         self,
         id,
+        prompt,
         llm_id,
         task,
         response,
@@ -502,19 +528,20 @@ class Router:
         available_routers,
     ):
         self.duckdb.insert(
-            id,
-            llm_id,
-            self.site,
-            task,
-            response,
-            response_time,
-            network_time,
-            routing_time,
-            execution_time,
-            energy,
-            selection_probability,
-            possible_models,
-            available_routers,
+            query_id=id,
+            prompt=prompt,
+            llm_id=llm_id,
+            site=self.site,
+            task=task,
+            response=response,
+            response_time=response_time,
+            network_time=network_time,
+            routing_time=routing_time,
+            execution_time=execution_time,
+            energy=energy,
+            routing_confidence=selection_probability,
+            available_models=possible_models,
+            available_routers=available_routers,
         )
 
     async def _store_reference(self, id, reference):

@@ -74,7 +74,10 @@ def test_predict(models, routers):
     routing = Routing(RoutingConfig())
 
     prediction = routing.predict(
-        router_library=routers, llm_library=models, context={"task": "classification"}
+        router_library=routers,
+        llm_library=models,
+        context={"task": "classification"},
+        prompt="",
     )
 
     assert len(prediction) == len(routers) + len(models)
