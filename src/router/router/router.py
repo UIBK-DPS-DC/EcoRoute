@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import random
 import time
 from typing import Dict, List
 
@@ -23,6 +24,7 @@ class Router:
         self,
         js,
         task_classifier: Classifier,
+        difficulty_classifier: Classifier,
         config: AppConfig,
     ):
         self.config = config.router
@@ -33,6 +35,7 @@ class Router:
         self.router_registry = {}
         self.js = js
         self.task_classifier = task_classifier
+        self.difficulty_classifier = difficulty_classifier
         self.pending_requests: dict[str, PendingRequest] = {}
         self.pending_requests_per_llm: dict[str, int] = {}
         self.routing = get_algorithm(config.routing)
@@ -44,6 +47,8 @@ class Router:
 
         # Just for RouterBench testing
         self.queries_seen = {}
+        self.queries_seen_router = {}
+        self.router_num_models = {"router_uc": 5, "router_tacc": 4}
 
     async def init(self):
         logger.info("Creating bucket LLM_REGISTRY...")
@@ -124,6 +129,10 @@ class Router:
     def reset_mab_model(self):
         self.routing.reset_model()
 
+    def reset(self):
+        self.duckdb.reset()
+        self.routing.reset_model()
+
     def _get_available_routers(self, task) -> List[AvailableRouter]:
         available_routers = []
         for router_id, data in self.router_registry.items():
@@ -171,7 +180,11 @@ class Router:
             f"Task classification: Predicted task = {task_pred} | Probabilities = {probs}"
         )
 
-        return {"task": task_pred}
+        difficulty_score = None
+        if self.config.use_difficulty_classification:
+            difficulty_score = self.difficulty_classifier.predict(query)
+
+        return {"task": task_pred, "difficulty": difficulty_score}
 
     def route(self, query: Query, pending_requests_per_llm: dict[str, int]):
         available_models = self._get_available_models()
@@ -190,8 +203,8 @@ class Router:
         # Otherwise the original router learns to send queries to router B through router A
         # instead of sending to B directly
         available_routers = []
-        # if not query.sent_from_router():
-        #     available_routers = self._get_available_routers(context["task"])
+        if not query.sent_from_router():
+            available_routers = self._get_available_routers(context["task"])
 
         for model in possible_models:
             model.pending_requests = 0
@@ -272,14 +285,22 @@ class Router:
         data["router_receive_timestamp"] = receive_timestamp
 
         pending_request = self.pending_requests.get(query_id)
-        future = pending_request.future
-
-        if future and not future.done():
-            future.set_result(data)
+        if pending_request is None:
+            logger.info(
+                f"There was no pending request for query {query_id}. Pending request is null."
+            )
+            await msg.ack()
         else:
-            logger.info(f"There was no pending request for query {query_id}")
+            future = pending_request.future
 
-        await msg.ack()
+            if future and not future.done():
+                future.set_result(data)
+            else:
+                logger.info(
+                    f"There was no pending request for query {query_id}. Future is null or already done."
+                )
+
+            await msg.ack()
 
     async def handle_query(
         self, query: Query, query_from_router_receive_timestamp: float = None
@@ -300,21 +321,6 @@ class Router:
             return
 
         selection, prob, context, possible_models, available_routers = routing_result
-
-        # if query.query not in self.queries_seen:
-        #     self.queries_seen[query.query] = []
-
-        # selected = False
-        # for m in possible_models:
-        #     if m.id not in self.queries_seen[query.query]:
-        #         selection = m
-        #         self.queries_seen[query.query].append(m.id)
-        #         selected = True
-        #         break
-        # if selected == False:
-        #     logger.warning(
-        #         f"SELECTION PROCCESS FAILED: {self.queries_seen[query.query]}"
-        #     )
 
         routing_time = time.perf_counter() - routing_start_time
 
@@ -386,6 +392,7 @@ class Router:
                 prompt=query.query,
                 llm_id=selection_id,
                 task=context["task"],
+                difficulty=context["difficulty"],
                 response=None,
                 routing_time=routing_time,
                 execution_time=None,
@@ -460,6 +467,7 @@ class Router:
             query.query,
             selection_id,
             context["task"],
+            context["difficulty"],
             response["output"],
             routing_time,
             response["execution_time"],
@@ -517,6 +525,7 @@ class Router:
         prompt,
         llm_id,
         task,
+        difficulty,
         response,
         routing_time,
         execution_time,
@@ -533,6 +542,7 @@ class Router:
             llm_id=llm_id,
             site=self.site,
             task=task,
+            difficulty=difficulty,
             response=response,
             response_time=response_time,
             network_time=network_time,

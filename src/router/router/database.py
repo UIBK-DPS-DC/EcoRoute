@@ -54,6 +54,7 @@ class TrainingSample(BaseModel):
     llm_id: str
     site: str
     task: str
+    difficulty: Optional[float] = None
     response: Optional[str] = None
     reward: Optional[float] = None
     output_quality: Optional[float] = None
@@ -89,6 +90,7 @@ class DuckDB:
         llm_id VARCHAR,
         site VARCHAR,
         task VARCHAR,
+        difficulty DOUBLE,
         response VARCHAR DEFAULT NULL,
         reward DOUBLE DEFAULT NULL,
         output_quality DOUBLE DEFAULT NULL,
@@ -154,6 +156,20 @@ class DuckDB:
         filename = config.file_name.replace("{{ROUTER_ID}}", router_id)
         return os.path.join(config.file_path, filename)
 
+    def reset(self):
+        con = duckdb.connect(self.db_file)
+
+        queries = [
+            "DELETE FROM metrics",
+            "DELETE FROM llm",
+            "DELETE FROM reference",
+            "DELETE FROM router",
+            "DELETE FROM request_time",
+        ]
+
+        for query in queries:
+            con.execute(query)
+
     def insert_query_times(self, query_id: str, llm_id: str, query_times: QueryTimes):
         con = duckdb.connect(self.db_file)
 
@@ -201,6 +217,7 @@ class DuckDB:
         llm_id,
         site,
         task,
+        difficulty,
         response,
         response_time,
         network_time,
@@ -222,6 +239,7 @@ class DuckDB:
             llm_id,
             site,
             task,
+            difficulty,
             response,
             response_time,
             network_time,
@@ -232,7 +250,7 @@ class DuckDB:
             processed,
         ]
         con.execute(
-            f"INSERT INTO metrics (query_id, prompt, timestamp, llm_id, site, task, response, response_time, network_time, routing_time, execution_time, energy, routing_confidence, processed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            f"INSERT INTO metrics (query_id, prompt, timestamp, llm_id, site, task, difficulty, response, response_time, network_time, routing_time, execution_time, energy, routing_confidence, processed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             parameters=params,
         )
         self.metrics_since_last_training_batch += 1

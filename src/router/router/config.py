@@ -7,6 +7,7 @@ class RouterConfig(BaseModel):
     model_ttl: int = 30
     router_heartbeat_interval_seconds: int = 15
     use_task_classification: bool = True
+    use_difficulty_classification: bool = True
     router_log_file: str = "/data/db/app.log"
     router_logging_level: str = "info"
     query_timeout: float = 600.0
@@ -33,8 +34,16 @@ class MLPRoutingConfig(BaseModel):
     learning_rate: float = 0.001
 
 
+class RandomConfig(BaseModel):
+    num_models: dict[str, int]
+
+
+class CollectionConfig(BaseModel):
+    num_models: dict[str, int]
+
+
 class RoutingConfig(BaseModel):
-    algorithm: Literal["mab", "heuristic", "knn", "mlp"] = "mab"
+    algorithm: Literal["mab", "heuristic", "knn", "mlp", "random", "collection"] = "mab"
     model_path: str | None = None
     model_save_dir: str = "/data/mab"
     training_data_path: str = "/data/routerbench/training_data.pkl"
@@ -43,6 +52,8 @@ class RoutingConfig(BaseModel):
     heuristic: HeuristicRoutingConfig | None = None
     knn: KNNRoutingConfig | None = None
     mlp: MLPRoutingConfig | None = None
+    random: RandomConfig | None = None
+    collection: CollectionConfig | None = None
 
     @model_validator(mode="after")
     def validate_selected_algorithm(self):
@@ -69,6 +80,10 @@ class TrainerConfig(BaseModel):
     reward_output_quality_weight: float = 0.5
     reward_response_time_weight: float = 0.5
     reward_energy_consumption_weight: float = 0.5
+    lambda_utilization: float = 0.1
+    lambda_efficiency: float = 0.1
+    lambda_time: float = 0.5
+
     bounds_file_path: str = "/config/bounds.yml"
     dummy_output_quality: bool = False
 

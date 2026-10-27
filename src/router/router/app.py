@@ -7,7 +7,7 @@ from nats.aio.client import Client as NATS
 from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
 
-from .classification import TaskClassifier
+from .classification import TaskClassifier, DifficultyClassifier
 from .config import load_config
 from .jetstream import JetStreamClient
 from .models import Query, QueryRequest
@@ -67,8 +67,8 @@ def save_model():
 
 @app.get("/reset")
 def reset_model():
-    router.reset_mab_model()
-    return f"Reset Multi-Armed-Bandit model"
+    router.reset()
+    return "Reset router"
 
 
 async def main():
@@ -114,7 +114,16 @@ async def main():
     ]
     task_classifier.train(datasets)
 
-    router = Router(js=js, task_classifier=task_classifier, config=config)
+    difficulty_classifier = None
+    if config.router.use_difficulty_classification:
+        difficulty_classifier = DifficultyClassifier(None, None)
+
+    router = Router(
+        js=js,
+        task_classifier=task_classifier,
+        difficulty_classifier=difficulty_classifier,
+        config=config,
+    )
     await router.init()
 
     logger.info("Router started, waiting for messages...")

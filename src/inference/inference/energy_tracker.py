@@ -155,7 +155,8 @@ class EnergyTracker:
         self.energy_per_query[query_id] = 0.0
 
     def retrieve_energy_for_query(self, query_id):
-        value = self.energy_per_query.pop(query_id)
+        value = self.energy_per_query.pop(query_id, 0.0)
+        logger.info(f"Retrieved energy value for {query_id}: {value}")
         return value
 
     async def run(self):

@@ -47,6 +47,10 @@ class Trainer:
         self.response_time_weight = config.reward_response_time_weight
         self.energy_consumption_weight = config.reward_energy_consumption_weight
 
+        self.lambda_utilization = config.lambda_utilization
+        self.lambda_efficiency = config.lambda_efficiency
+        self.lambda_time = config.lambda_time
+
         self.metrics_map = {
             "squad": "f1",
             "natural_questions": "rougeLsum",
@@ -122,19 +126,30 @@ class Trainer:
         elif normalized_output_quality < (0.75 * mean_output_quality):
             return -1.0
 
+        # ensure no divisions by 0
+        if mean_response_time < 0.1:
+            mean_response_time = 0.1
+
         time_component = np.log((response_time / mean_response_time))
+
+        # ensure no divisions by 0
+        if mean_energy < 0.1:
+            mean_energy = 0.1
 
         energy_component = np.log((energy_consumption / mean_energy))
 
-        efficiency = -0.5 * time_component - 0.5 * energy_component
+        efficiency = (
+            -self.lambda_time * time_component
+            - (1.0 - self.lambda_time) * energy_component
+        )
 
-        utilization = math.exp(-0.1 * pending_queries)
+        utilization = math.exp(-self.lambda_utilization * pending_queries)
 
         efficiency = max(-1.0, min(1.0, efficiency))
 
         reward = (
             utilization * self.output_quality_weight * normalized_output_quality
-            + 0.1 * efficiency
+            + self.lambda_efficiency * efficiency
         )
 
         logger.info(
@@ -286,7 +301,7 @@ class Trainer:
                 logger.info(f"Training with batch of size {len(batch)}")
 
                 for sample in batch:
-                    context = {"task": sample.task}
+                    context = {"task": sample.task, "difficulty": sample.difficulty}
                     logger.info(f"Available models: {sample.available_models}")
                     logger.info(f"Available routers: {sample.available_routers}")
 

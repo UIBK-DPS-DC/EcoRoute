@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 class RoutingAlgorithm(ABC):
     def __init__(self, config: RoutingConfig, **kwargs):
         self.config = config
+        self.site = os.getenv("SITE", "uc")
 
     @abstractmethod
     def predict(
@@ -125,6 +126,7 @@ class Heuristic(RoutingAlgorithm):
 
 class Routing(RoutingAlgorithm):
     def __init__(self, config: RoutingConfig, **kwargs):
+        # self.site = os.getenv("SITE", "uc")
         self.save_dir = config.model_save_dir
 
         mab_options = " ".join(["--cb_explore_adf -q TM", config.mab.mab_options])
@@ -132,8 +134,11 @@ class Routing(RoutingAlgorithm):
         if config.model_path is None:
             self.vw = vowpalwabbit.Workspace(mab_options, quiet=True)
         else:
+            model_name = f"mab_model_{self.site}.vw"
+            model_path = os.path.join(config.model_path, model_name)
+            logger.info(f"Loading {model_path}")
             self.vw = vowpalwabbit.Workspace(
-                f"{mab_options} -i {config.model_path}", quiet=True
+                f"{mab_options} -i {model_path}", quiet=True
             )
         logger.info("Routing initialized")
 
@@ -164,7 +169,9 @@ class Routing(RoutingAlgorithm):
         self.vw.learn(vw_string)
 
     def save_model(self) -> str:
-        filename = os.path.join(self.save_dir, f"mab_model_{datetime.now()}.vw")
+        filename = os.path.join(
+            self.save_dir, f"mab_model_{datetime.now()}_checkpoint.vw"
+        )
         self.vw.save(filename)
         return filename
 
@@ -179,7 +186,7 @@ class Routing(RoutingAlgorithm):
         training_data=None,
     ):
         context_string = " ".join(
-            [f"{cont}:{value}" for cont, value in context.items()]
+            [f"{cont}:{value}" for cont, value in context.items() if value is not None]
         )
         shared_features = f"shared |Task {context_string}"
         action_string = self._create_actions_string(
@@ -256,6 +263,134 @@ class Routing(RoutingAlgorithm):
                 f"{training_string}|Model {id_name}={action.id} {action_context}"
             )
         return "\n".join(action_strings)
+
+
+class RandomSelection(RoutingAlgorithm):
+    def __init__(self, config, **kwargs):
+        super().__init__(config, **kwargs)
+
+    def predict(self, router_library, llm_library, context, prompt):
+        num_models = self.config.random.num_models
+        options = []
+        weights = []
+        total = 0
+        for site, num in num_models.items():
+            options.append(site)
+            weights.append(float(num))
+            total += num
+
+        weights = np.asarray(weights)
+        weights /= float(total)
+
+        # ensure weights summing to 1
+        weights[-1] = 1.0 - weights[:-1].sum()
+
+        selected = None
+        if len(router_library) > 0:
+
+            selected = random.choices(options, weights=weights, k=1)[0]
+        else:
+            selected = self.site
+
+        if selected == self.site:
+            llm_library.sort(key=lambda x: x.id)
+
+            options = np.arange(len(llm_library))
+            idx = random.choices(options, k=1)[0]
+
+            length = len(llm_library) + len(router_library)
+
+            selection_probs = [0.0 for i in range(length)]
+            selection_probs[idx] = 1.0
+            return selection_probs
+
+        else:
+            router_library.sort(key=lambda x: x.id)
+
+            idx = None
+            for i, r in enumerate(router_library):
+                if selected in r.id:
+                    idx = i
+
+            if idx is None:
+                logger.error(
+                    f"Site {selected} was not found in available routers. Selecting first router."
+                )
+                idx = 0
+
+            length = len(llm_library) + len(router_library)
+
+            selection_probs = [0.0 for i in range(length)]
+            selection_probs[len(llm_library) + idx] = 1.0
+            return selection_probs
+
+    def learn(
+        self, router_library, llm_library, context, selected_llm, selection_prob, cost
+    ):
+        pass
+
+
+class DataCollection(RoutingAlgorithm):
+    def __init__(self, config, **kwargs):
+        super().__init__(config, **kwargs)
+        self.queries_seen = {}
+        self.queries_seen_router = {}
+        self.router_num_models = self.config.collection.num_models
+
+    def predict(self, router_library, llm_library, context, prompt):
+        if prompt not in self.queries_seen:
+            self.queries_seen[prompt] = []
+        if prompt not in self.queries_seen_router:
+            self.queries_seen_router[prompt] = {r.id: 0 for r in router_library}
+
+        llm_library.sort(key=lambda x: x.id)
+        router_library.sort(key=lambda x: x.id)
+
+        selection_idx = None
+
+        selected = False
+        for idx, m in enumerate(llm_library):
+            if m.id not in self.queries_seen[prompt]:
+                selection_idx = idx
+                self.queries_seen[prompt].append(m.id)
+                selected = True
+                logger.info(
+                    f"COLLECTION SELECTION for {prompt}: {llm_library[selection_idx].id}"
+                )
+                break
+
+        if selected == False:
+            for idx, r in enumerate(router_library):
+                if (
+                    self.queries_seen_router[prompt][r.id]
+                    < self.router_num_models[self._extract_site(r.id)]
+                ):
+                    self.queries_seen_router[prompt][r.id] += 1
+                    selection_idx = len(llm_library) + idx
+                    selected = True
+                    logger.info(
+                        f"COLLECTION SELECTION for {prompt}: {router_library[idx].id}"
+                    )
+                    break
+        if selected == False:
+            logger.warning(
+                f"SELECTION PROCCESS FAILED: {self.queries_seen[prompt]}, {self.queries_seen_router[prompt]}"
+            )
+            selection_idx = 0
+
+        length = len(llm_library) + len(router_library)
+
+        selection_probs = [0.0 for i in range(length)]
+        selection_probs[selection_idx] = 1.0
+        return selection_probs
+
+    def learn(
+        self, router_library, llm_library, context, selected_llm, selection_prob, cost
+    ):
+        pass
+
+    def _extract_site(self, router_id: str):
+        return router_id.removeprefix("router-")
 
 
 class RouterBenchAlgorithm(RoutingAlgorithm):
@@ -526,6 +661,8 @@ ROUTING_ALGORITHMS = {
     "mab": Routing,
     "knn": KNNRouterBench,
     "mlp": MLPRouterBench,
+    "random": RandomSelection,
+    "collection": DataCollection,
 }
 
 

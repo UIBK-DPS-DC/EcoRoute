@@ -7,7 +7,7 @@ import socket
 import time
 import uuid
 
-import docker
+# import docker
 import httpx
 from dotenv import load_dotenv
 from energy_tracker import EnergyTracker
@@ -37,12 +37,12 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-client = docker.from_env()
+# client = docker.from_env()
 
-container_id = socket.gethostname()
-container = client.containers.get(container_id)
+# container_id = socket.gethostname()
+# container = client.containers.get(container_id)
 
-print(container.name)
+# print(container.name)
 
 NATS_URL = os.getenv("NATS_URL", "nats")
 SITE = os.getenv("SITE", "uc")
@@ -50,14 +50,14 @@ LOCAL = os.getenv("LOCAL", False)
 
 LLM_ID = os.getenv("LLM_ID", None)
 
-LLM_ID = container.name
+# LLM_ID = container.name
 
 if LLM_ID is None:
     LLM_ID = f"{SITE}-{uuid.uuid4()}"
 
 LLM_ID_CLEANED = convert_llm_id(LLM_ID)
 
-random.seed("97" + LLM_ID)
+# random.seed("97" + LLM_ID)
 
 heartbeat_interval = config.model.heartbeat_interval_seconds
 
@@ -65,6 +65,8 @@ logger.info(f"{LLM_ID=}, {NATS_URL=}")
 
 semaphore = asyncio.Semaphore(config.model.max_concurrent_queries)
 tracker = EnergyTracker(config.energy_tracker)
+
+query_batch_size = config.model.query_batch_size
 
 
 instance_odd = False
@@ -77,7 +79,7 @@ def create_request(prompt):
         return "http://localhost:8000/v1/completions", {
             "model": LLM_ID,
             "prompt": prompt,
-            "max_tokens": 200,
+            "max_tokens": config.model.max_output_tokens,
         }
     elif SITE == "tacc" or SITE == "edge":
         return "http://localhost:11434/api/chat", {
@@ -104,6 +106,8 @@ async def call_vllm_local(prompt, active_queries=None):
 
     latency = random.gauss(performance["latency"]["mu"], performance["latency"]["std"])
 
+    if latency < 0.0:
+        latency = 1.0
     logger.info(f"Waiting for {latency} seconds")
 
     if active_queries is None:
@@ -170,6 +174,7 @@ async def handle_request(msg):
         response = {"message": {"content": "model crashed"}}
     finally:
         await tracker.decrease_active_queries()
+
     end_time = time.perf_counter()
     end_timestamp = time.time()
     execution_time = end_time - start_time
@@ -232,11 +237,16 @@ async def worker():
         latency_mu_max = 15.0
         latency_std_min = 1.5
         latency_std_max = 3.0
-    elif SITE == "edge":
+    elif SITE == "uc":
         latency_mu_min = 15.0
         latency_mu_max = 20.0
         latency_std_min = 1.5
         latency_std_max = 3.0
+
+    # latency_mu_min = 5.0
+    # latency_mu_max = 20.0
+    # latency_std_min = 0.1
+    # latency_std_max = 3.0
 
     # just for testing
     # used to draw samples for reward, latency and energy for each model
@@ -259,18 +269,10 @@ async def worker():
 
     for task, odd in zip(tasks, odds):
 
-        # mu = 0.1
-        # std = 0.05
-        # if instance_odd == odd:
-        #     mu = 0.9
-        #     std = 0.05
-        # performance["tasks"][task] = {
-        #     "mu": mu,
-        #     "std": std,
-        # }
         performance["tasks"][task] = {
             "mu": random.uniform(0.0, 1.0),
-            "std": random.uniform(0.05, 0.07),
+            # "std": random.uniform(0.05, 0.15),
+            "std": random.uniform(0.25, 0.45),
         }
 
     registration = {"llm_id": LLM_ID_CLEANED, "performance": performance}
@@ -303,7 +305,7 @@ async def worker():
 
     while True:
         try:
-            msgs = await sub.fetch(1, timeout=1)
+            msgs = await sub.fetch(query_batch_size, timeout=1)
         except:
             continue
 

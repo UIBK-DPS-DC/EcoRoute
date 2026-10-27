@@ -8,7 +8,7 @@ uvicorn
 prettytable
 seaborn
 vowpalwabbit
-duckdb
+duckdb==1.5.5
 evaluate
 rouge_score
 nltk
