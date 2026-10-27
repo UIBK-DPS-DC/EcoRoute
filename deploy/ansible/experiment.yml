@@ -1,0 +1,145 @@
+- name: Prepare routers
+  hosts: router
+  tags: routers
+  become: yes
+  remote_user: cc
+
+  tasks:
+
+    - name: Ensure deployment directory exists
+      ansible.builtin.file:
+        path: /home/cc/deploy
+        state: directory
+        owner: cc
+        group: cc
+        mode: '0755'
+
+    - name: Archive deploy dir
+      community.general.archive:
+        path: "."
+        dest: "/tmp/deploy-dir.tar.gz"
+        format: gz
+      delegate_to: localhost
+      run_once: true
+      become: false
+
+    - name: Copy archive to remote host
+      ansible.builtin.copy:
+        src: "/tmp/deploy-dir.tar.gz"
+        dest: "/home/cc/deploy/deploy-dir.tar.gz"
+
+    - name: Unarchive deploy dir
+      ansible.builtin.unarchive:
+        src: "/home/cc/deploy/deploy-dir.tar.gz"
+        dest: "/home/cc/deploy/"
+        remote_src: true
+
+    - name: Copy evaluation datasets
+      copy:
+        src: "../../../edge-cloud-llm-routing/src/hf_tmp/targets/datasets.tar.gz"
+        dest: "/home/cc/deploy/datasets.tar.gz"
+        owner: cc
+        group: cc
+
+    - name: Unarchive evaluation datasets
+      unarchive:
+        src: "/home/cc/deploy/datasets.tar.gz"
+        dest: "/home/cc/deploy/"
+        remote_src: true
+
+    - name: Copy configs
+      copy:
+        src: "../../config"
+        dest: "/home/cc/deploy"
+        owner: cc
+        group: cc
+
+    - name: Copy evaluation directory
+      copy:
+        src: "../../evaluation"
+        dest: "/home/cc/deploy"
+        owner: cc
+        group: cc
+
+- name: Install Ansible in a virtual environment on remote devices
+  hosts: router
+  tags: ansible
+  become: yes
+  remote_user: cc
+
+  vars:
+    venv_path: /opt/ansible-venv
+
+  tasks:
+    - name: Install Python prerequisites
+      ansible.builtin.apt:
+        name:
+          - python3
+          - python3-venv
+        state: present
+        update_cache: true
+
+    - name: Create virtual environment
+      ansible.builtin.command:
+        cmd: "python3 -m venv {{ venv_path }}"
+        creates: "{{ venv_path }}/bin/python"
+
+    - name: Install Ansible in virtual environment
+      ansible.builtin.pip:
+        name: 
+          - ansible
+          - httpx
+          - argparse
+          - pandas
+          - tqdm
+          - python-dotenv
+          - pyarrow
+        virtualenv: "{{ venv_path }}"
+        virtualenv_command: "python3 -m venv"
+
+- name: Create SSH key pair
+  hosts: router
+  tags: key
+  become: yes
+  remote_user: cc
+
+  tasks:
+    - name: Generate SSH key pair if it does not exist
+      community.crypto.openssh_keypair:
+        path: /home/cc/.ssh/id_ed25519
+        type: ed25519
+        owner: cc
+        group: cc
+        mode: '0600'
+        regenerate: never
+
+- name: Collect SSH public keys
+  hosts: router
+  tags: collect
+  become: true
+  tasks:
+    - name: Read public SSH key
+      ansible.builtin.slurp:
+        src: /home/cc/.ssh/id_ed25519.pub
+      register: ssh_public_key
+
+    - name: Store public key as a host fact
+      ansible.builtin.set_fact:
+        public_key: "{{ ssh_public_key.content | b64decode | trim }}"
+    
+    - name: Verify collected public keys
+      ansible.builtin.debug:
+        msg: "Public key collected for {{ inventory_hostname }}"
+      when: public_key is defined
+
+- name: Distribute SSH public keys
+  hosts: router:model_amd:model_cpu:model_nvidia
+  tags: dist
+  become: true
+  tasks:
+    - name: Authorize public keys from all devices
+      ansible.posix.authorized_key:
+        user: cc
+        key: "{{ hostvars[item]['public_key'] }}"
+        state: present
+      loop: "{{ groups['router'] }}"

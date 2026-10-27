@@ -1,2 +1,2 @@
-model: "Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF"
-model_file: "qwen2.5-coder-1.5b-instruct-q4_k_m.gguf"
+model: "bartowski/HuggingFaceTB_SmolLM3-3B-GGUF"
+model_file: "HuggingFaceTB_SmolLM3-3B-Q4_K_M.gguf"

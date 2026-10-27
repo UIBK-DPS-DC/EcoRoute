@@ -5,7 +5,6 @@ import os
 import re
 import time
 from glob import glob
-from eval_openrouter import send_at_rate_openrouter
 
 import httpx
 import pandas as pd
@@ -111,7 +110,7 @@ parser.add_argument(
     help="Names of datasets that shall be used exclusively for the samples",
 )
 
-parser.add_argument("-t", "--time", type=int, default=60, help="Runtime in minutes")
+parser.add_argument("-t", "--time", type=float, default=60.0, help="Runtime in minutes")
 parser.add_argument(
     "-e",
     "--end",
@@ -134,8 +133,6 @@ exceptions = args.skip
 num_samples = int(args.num * 60 * args.time)
 
 sending = send_at_rate
-if "openrouter" in URL:
-    sending = send_at_rate_openrouter
 
 datasets = []
 
@@ -174,6 +171,7 @@ for file in glob(os.path.join(data_path, "prepared-*.pkl")):
     df = pd.read_pickle(file)
     test_set = df.tail(args.end)
     samples = test_set.sample(n=min(num_samples_per_dataset, len(test_set))).copy()
+    # samples = test_set.head(num_samples_per_dataset).copy()
 
     if dataset == "mbpp":
         samples = samples.rename(columns={"test_list": "target"}).drop(
@@ -184,6 +182,8 @@ for file in glob(os.path.join(data_path, "prepared-*.pkl")):
     samples["dataset"] = dataset
 
     total_samples.append(samples)
+    # for i in range(14):
+    #    total_samples.append(samples)
 
 combined = pd.concat(total_samples, ignore_index=True)
 combined = combined.sample(frac=1, random_state=42).reset_index(drop=True)

@@ -1,2 +1,2 @@
-model: "Qwen/Qwen2.5-3B-Instruct-GGUF"
-model_file: "qwen2.5-3b-instruct-q4_k_m.gguf"
+model: "bartowski/Altworld_Hemmingway-1-GGUF"
+model_file: "Altworld_Hemmingway-1-Q4_K_M.gguf"

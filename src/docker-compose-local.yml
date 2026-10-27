@@ -50,6 +50,7 @@ services:
       - ../config/router:/config
       - ../local/db:/data/db
       - ../data/routerbench:/data/routerbench
+      - ../local/mab:/data/mab
     depends_on:
       - nats-uc
     ports:
@@ -71,6 +72,7 @@ services:
       - ../config/router:/config
       - ../local/db:/data/db
       - ../data/routerbench:/data/routerbench
+      - ../local/mab:/data/mab
     depends_on:
       - nats-tacc
     ports:
@@ -92,7 +94,7 @@ services:
       - ../config/router:/config
       - ../local/db:/data/db
       - ../data/routerbench:/data/routerbench
-      # - ./mab:/data/mab
+      - ../local/mab:/data/mab
     depends_on:
       - nats-edge
     ports:

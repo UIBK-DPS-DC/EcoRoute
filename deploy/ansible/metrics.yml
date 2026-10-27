@@ -16,6 +16,9 @@
     run_config:
       queries_per_second: "{{ queries_per_second }}"
       duration: "{{ duration }}"
+      lambda_u: "{{ lambda_u }}"
+      lambda_e: "{{ lambda_e }}"
+      lambda_t: "{{ lambda_t }}"
 
   tasks:
     - name: Ensure stored directory exists
@@ -34,6 +37,12 @@
       copy:
         src: "/home/cc/code/config/router/config.yml"
         dest: "/home/cc/code/stored/{{ hostvars['localhost']['backup_timestamp'] }}/config.yml"
+        remote_src: true
+
+    - name: Copy MAB models
+      copy:
+        src: "/home/cc/code/mab/"
+        dest: "/home/cc/code/stored/{{ hostvars['localhost']['backup_timestamp'] }}/mab/"
         remote_src: true
 
     - name: Write run config as YAML

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-INVENTORY="../deploy/ansible/inventory.ini"
+INVENTORY="inventory.ini"
 KNOWN_HOSTS="$HOME/.ssh/known_hosts"
 
 # Extract all IPs from ansible_host= fields

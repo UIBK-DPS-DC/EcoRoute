@@ -12,17 +12,31 @@
         owner: cc
         group: cc
     
-    - name: Copy configs
-      copy:
-        src: "../../config"
-        dest: "/home/cc/code"
-        owner: cc
-        group: cc
-
     - name: Copy docker compose
       copy:
         src: "../../src/docker-compose.yml"
         dest: "/home/cc/code/docker-compose.yml"
+        owner: cc
+        group: cc
+
+    - name: Copy mab models
+      copy:
+        src: "../../remote/mab"
+        dest: "/home/cc/code"
+        owner: cc
+        group: cc
+
+- name: Copy configs
+  hosts: router
+  tags: configs
+  become: yes
+  remote_user: cc
+
+  tasks:
+    - name: Copy configs
+      copy:
+        src: "../../config"
+        dest: "/home/cc/code"
         owner: cc
         group: cc
 
@@ -108,12 +122,12 @@
     # - name: Purge all streams
     #   command: "nats stream purge {{ item }} --force"
     #   loop: "{{ stream_names }}"
-    # - name: Purge all streams
-    #   command: "nats stream purge {{ item }} --force"
-    #   loop:
-    #     - "ROUTING_REQUESTS"
-    #     - "ROUTING_RESPONSE"
-    #     - "ROUTING_REQUESTS_ROUTER"
+    - name: Purge all streams
+      command: "nats stream purge {{ item }} --force"
+      loop:
+        - "ROUTING_REQUESTS"
+        - "ROUTING_RESPONSE"
+        - "ROUTING_REQUESTS_ROUTER"
 
     - name: Find duckdb files
       ansible.builtin.find:
@@ -134,6 +148,21 @@
         path: "{{ item.path }}"
         state: absent
       loop: "{{ duckdb_files.files }}"
+      when: reset
+
+    - name: Find MAB files
+      ansible.builtin.find:
+        paths: "/home/cc/code/mab"
+        patterns: "*_checkpoint.vw"
+        file_type: file
+      register: mab_files
+      when: reset
+
+    - name: Delete MAB file
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ mab_files.files }}"
       when: reset
 
 - name: Start routers

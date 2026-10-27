@@ -23,7 +23,7 @@ vllm serve $MODEL \
     --block-size 32 \
     --max_num_batched_tokens 9000 \
     --max-model-len 9000 \
-    --host localhost \
+    --host 0.0.0.0 \
     --port 8000 \
     --dtype=half \
     --trust-remote-code
